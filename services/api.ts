@@ -46,17 +46,21 @@ export const api = {
     }
   },
   tasks: {
-    getAll: async (userId: string): Promise<Task[]> => {
+    getAll: async (userId: string | number): Promise<Task[]> => {
       try {
-        if (userId.startsWith('mock-')) return []; // Mock users don't have backend data
-        const response = await fetch(`${API_BASE_URL}/tasks?userId=${userId}`);
+        // [Fix] DB returns ID as number, convert to string safely
+        const uidStr = String(userId);
+        
+        if (uidStr.startsWith('mock-')) return []; 
+        
+        const response = await fetch(`${API_BASE_URL}/tasks?userId=${uidStr}`);
         return handleResponse(response);
       } catch (error) {
         console.warn("API Error (Tasks):", error);
         return [];
       }
     },
-    save: async (userId: string, task: Task): Promise<void> => {
+    save: async (userId: string | number, task: Task): Promise<void> => {
        try {
          await fetch(`${API_BASE_URL}/tasks`, {
            method: 'POST',
@@ -76,17 +80,21 @@ export const api = {
     }
   },
   knowledge: {
-      getAll: async (userId: string): Promise<KnowledgeItem[]> => {
+      getAll: async (userId: string | number): Promise<KnowledgeItem[]> => {
           try {
-             if (userId.startsWith('mock-')) return [];
-            const response = await fetch(`${API_BASE_URL}/knowledge?userId=${userId}`);
+            // [Fix] Ensure userId is treated as string
+            const uidStr = String(userId);
+
+            if (uidStr.startsWith('mock-')) return [];
+
+            const response = await fetch(`${API_BASE_URL}/knowledge?userId=${uidStr}`);
             return handleResponse(response);
           } catch (error) {
               console.warn("API Error (Knowledge):", error);
               return [];
           }
       },
-      save: async (userId: string, item: KnowledgeItem): Promise<void> => {
+      save: async (userId: string | number, item: KnowledgeItem): Promise<void> => {
         try {
           await fetch(`${API_BASE_URL}/knowledge`, {
             method: 'POST',
