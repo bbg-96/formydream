@@ -231,45 +231,74 @@ app.post('/api/mail/messages', async (req, res) => {
       const connection = await imaps.connect(imapConfig);
       await connection.openBox('INBOX');
       
-      // [NEW STRATEGY] 
-      // Instead of searching by date (which fails for large inboxes due to server limits),
-      // we fetch by Sequence Number.
-      // 'box.messages.total' gives the count. The last numbers are the newest.
       const total = connection.box.messages.total;
       
       if (total > 0) {
-          // Fetch last 50 messages (e.g., "1050:1100")
+          // CRITICAL FIX:
+          // Use Sequence Numbers (Position in Mailbox) instead of UIDs.
+          // This guarantees fetching the last 50 messages even if UIDs are non-sequential or huge.
           const start = Math.max(1, total - 49);
           const range = `${start}:${total}`;
           
-          const fetchOptions = {
-            bodies: ['HEADER', 'TEXT'],
-            markSeen: false,
-            struct: true
-          };
-          
-          // Use 'fetch' directly with range, bypassing 'search'
-          const messages = await connection.fetch(range, fetchOptions);
-          
-          for (const item of messages) {
-            const all = item.parts.find(p => p.which === 'TEXT');
-            const id = item.attributes.uid;
-            // Using seq number as fallback ID if UID missing, but UID preferred
-            const displayId = id || item.seq; 
-            const idHeader = "Imap-Id: "+displayId + "\r\n";
-            
-            const parsed = await simpleParser(idHeader + (all.body || ""));
-            
-            emails.push({
-              id: `imap-${displayId}`,
-              senderName: parsed.from?.text || 'Unknown',
-              senderAddress: parsed.from?.value?.[0]?.address || '',
-              subject: parsed.subject || '(No Subject)',
-              body: parsed.text || '(No Content)',
-              receivedAt: parsed.date ? parsed.date.toISOString() : new Date().toISOString(),
-              isRead: item.attributes.flags && item.attributes.flags.includes('\\Seen')
-            });
-          }
+          // Use underlying node-imap 'seq.fetch' specifically for sequence numbers
+          // imap-simple's default fetch/search methods can be ambiguous regarding UID vs Seq.
+          await new Promise((resolve, reject) => {
+              const fetcher = connection.imap.seq.fetch(range, {
+                  bodies: ['HEADER', 'TEXT'],
+                  struct: true,
+                  markSeen: false
+              });
+
+              fetcher.on('message', (msg, seqno) => {
+                  let attributes = null;
+                  let rawBody = '';
+
+                  msg.on('body', (stream, info) => {
+                      let buffer = '';
+                      stream.on('data', (chunk) => {
+                          buffer += chunk.toString('utf8');
+                      });
+                      stream.once('end', () => {
+                          rawBody = buffer;
+                      });
+                  });
+
+                  msg.once('attributes', (attrs) => {
+                      attributes = attrs;
+                  });
+
+                  msg.once('end', async () => {
+                      try {
+                        const id = attributes?.uid || seqno;
+                        const idHeader = `Imap-Id: ${id}\r\n`;
+                        // SimpleParser needs the full raw message ideally, but we have parts.
+                        // We construct a fake raw message or parse the parts we have.
+                        // Here we attempt to parse the body part we fetched.
+                        const parsed = await simpleParser(idHeader + rawBody);
+                        
+                        emails.push({
+                            id: `imap-${id}`,
+                            senderName: parsed.from?.text || 'Unknown',
+                            senderAddress: parsed.from?.value?.[0]?.address || '',
+                            subject: parsed.subject || '(No Subject)',
+                            body: parsed.text || '(No Content)',
+                            receivedAt: parsed.date ? parsed.date.toISOString() : (attributes?.date ? attributes.date.toISOString() : new Date().toISOString()),
+                            isRead: attributes?.flags?.includes('\\Seen') || false
+                        });
+                      } catch (e) {
+                          console.error("Parse error on msg", seqno, e);
+                      }
+                  });
+              });
+
+              fetcher.once('error', (err) => {
+                  reject(err);
+              });
+
+              fetcher.once('end', () => {
+                  resolve();
+              });
+          });
       }
       await connection.end();
 
@@ -284,11 +313,9 @@ app.post('/api/mail/messages', async (req, res) => {
         tlsOptions: { rejectUnauthorized: false }
       });
 
-      // pop3.LIST() returns an array of messages with msgNumber and size
       const list = await pop3.LIST();
-      const total = list.length; // List is array in node-pop3
+      const total = list.length; 
       
-      // Fetch last 50 messages (POP3 usually lists oldest to newest, so end is newest)
       const start = Math.max(1, total - 49); 
       
       for (let i = total; i >= start; i--) {
@@ -312,7 +339,7 @@ app.post('/api/mail/messages', async (req, res) => {
       await pop3.QUIT();
     }
 
-    // Explicit Sort: Newest First (just to be safe after fetching)
+    // Sort: Newest First
     emails.sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt));
 
     res.json(emails);
