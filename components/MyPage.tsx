@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User } from '../types';
-import { User as UserIcon, Mail, Shield, Key, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { User as UserIcon, Mail, Shield, Key, Check, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
 import { api } from '../services/api';
 
 interface MyPageProps {
@@ -39,6 +39,9 @@ export const MyPage: React.FC<MyPageProps> = ({ user }) => {
       setIsLoading(false);
     }
   };
+
+  const isMismatch = confirmPassword && newPassword !== confirmPassword;
+  const isMatch = confirmPassword && newPassword === confirmPassword;
 
   return (
     <div className="p-6 max-w-4xl mx-auto animate-fade-in">
@@ -108,13 +111,28 @@ export const MyPage: React.FC<MyPageProps> = ({ user }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">새 비밀번호 확인</label>
-              <input 
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                placeholder="비밀번호 다시 입력"
-              />
+              <div className="relative">
+                <input 
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`w-full border rounded-lg p-3 pr-10 outline-none transition-all ${
+                        isMismatch 
+                            ? 'border-red-300 focus:ring-2 focus:ring-red-200 bg-red-50' 
+                            : isMatch
+                                ? 'border-green-300 focus:ring-2 focus:ring-green-200 bg-green-50'
+                                : 'border-gray-300 focus:ring-2 focus:ring-blue-500'
+                    }`}
+                    placeholder="비밀번호 다시 입력"
+                />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    {isMatch && <CheckCircle size={20} className="text-green-500" />}
+                    {isMismatch && <AlertCircle size={20} className="text-red-500" />}
+                </div>
+              </div>
+              {isMismatch && (
+                <p className="text-xs text-red-500 mt-1 ml-1">비밀번호가 일치하지 않습니다.</p>
+              )}
             </div>
 
             {message && (
@@ -126,8 +144,8 @@ export const MyPage: React.FC<MyPageProps> = ({ user }) => {
 
             <button
               type="submit"
-              disabled={isLoading || !newPassword || !confirmPassword}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+              disabled={isLoading || !newPassword || !confirmPassword || !!isMismatch}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
               {isLoading && <Loader2 className="animate-spin" size={18} />}
               비밀번호 변경
