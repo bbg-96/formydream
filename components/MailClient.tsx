@@ -31,18 +31,17 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks }) => {
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
 
-  useEffect(() => {
-    // Check if previously connected (mock logic using localStorage)
-    const savedConn = localStorage.getItem('mail_connected');
-    if (savedConn === 'true') {
-      setIsConnected(true);
-      fetchEmails();
-    }
-  }, []);
+  // Auto-connect removed to ensure password is present in config
+  // The user must click "Connect" or we would need to persist encrypted password (not implemented for demo)
 
-  const fetchEmails = async () => {
+  const fetchEmails = async (configOverride?: any) => {
+    // If we don't have a password in state, we can't fetch.
+    const configToUse = configOverride || mailConfig;
+    if (!configToUse.password) return;
+
     setLoading(true);
-    const msgs = await api.mail.getMessages(user.id);
+    // Pass configToUse to API so backend has credentials
+    const msgs = await api.mail.getMessages(user.id, configToUse);
     setEmails(msgs);
     setLoading(false);
   };
@@ -80,14 +79,14 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks }) => {
     e.preventDefault();
     setLoading(true);
     const success = await api.mail.connect(user.id, mailConfig);
-    setLoading(false);
     
     if (success) {
       setIsConnected(true);
-      localStorage.setItem('mail_connected', 'true');
-      fetchEmails();
+      // Fetch immediately with current config
+      await fetchEmails(mailConfig);
     } else {
       alert('메일 서버 연결에 실패했습니다. 설정을 확인해주세요.');
+      setLoading(false);
     }
   };
 
@@ -224,7 +223,7 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks }) => {
           </form>
           <p className="mt-4 text-xs text-center text-gray-400">
              * 사내 메일 서버 정책에 따라 포트(110, 995 등)를 확인해주세요.<br/>
-             * 실제 백엔드 연동이 필요합니다 (현재는 시뮬레이션 모드)
+             * 연동 정보는 서버에 저장되지 않으며, 세션 유지 기간 동안만 유효합니다.
           </p>
         </div>
       </div>
@@ -243,7 +242,7 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks }) => {
             받은 편지함 ({mailConfig.protocol})
           </h3>
           <button 
-            onClick={fetchEmails} 
+            onClick={() => fetchEmails()} 
             className={`p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-all ${loading ? 'animate-spin' : ''}`}
           >
             <RefreshCw size={16} />
