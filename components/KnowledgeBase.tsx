@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Plus, Tag, BookOpen, X, Hash, Trash2, Image as ImageIcon, ArrowLeft, Save, List, ListOrdered, Indent, Outdent, AlertCircle, FileText, Edit } from 'lucide-react';
+import { Search, Plus, Tag, BookOpen, X, Hash, Trash2, Image as ImageIcon, ArrowLeft, Save, List, ListOrdered, Indent, Outdent, AlertCircle, FileText, Edit, Sparkles, Loader2, RotateCcw } from 'lucide-react';
 import { KnowledgeItem } from '../types';
 import { api } from '../services/api';
+import { searchKnowledgeBaseWithAI } from '../services/geminiService';
 
 interface KnowledgeBaseProps {
   items: KnowledgeItem[];
@@ -33,6 +34,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | 'ALL'>('ALL');
   
+  // AI Search State
+  const [isAiSearchMode, setIsAiSearchMode] = useState(false);
+  const [isAiSearching, setIsAiSearching] = useState(false);
+  const [aiResultIds, setAiResultIds] = useState<string[] | null>(null);
+
   // Editor State
   const [isWriting, setIsWriting] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null); // To track if we are editing a draft or existing item
@@ -51,14 +57,49 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
   const editorRef = useRef<HTMLDivElement>(null);
   const selectionRangeRef = useRef<Range | null>(null);
 
+  // Reset AI Search when mode is toggled off
+  useEffect(() => {
+    if (!isAiSearchMode) {
+      setAiResultIds(null);
+      setSearchTerm('');
+    }
+  }, [isAiSearchMode]);
+
+  const handleAiSearch = async () => {
+    if (!searchTerm.trim()) return;
+    setIsAiSearching(true);
+    const ids = await searchKnowledgeBaseWithAI(searchTerm, items);
+    setAiResultIds(ids);
+    setIsAiSearching(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && isAiSearchMode) {
+          handleAiSearch();
+      }
+  };
+
   const filteredItems = items.filter(item => {
-    const term = searchTerm.toLowerCase();
-    const contentText = stripHtml(item.content).toLowerCase();
-    const matchesSearch = item.title.toLowerCase().includes(term) || 
-                          item.tags.some(t => t.toLowerCase().includes(term)) ||
-                          contentText.includes(term);
+    // 1. Category Filter (Always applies)
     const matchesCategory = selectedCategory === 'ALL' || item.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    if (!matchesCategory) return false;
+
+    // 2. Search Logic
+    if (isAiSearchMode) {
+        // In AI Mode, if we have results, show only those.
+        // If we haven't searched yet (aiResultIds is null), show all (or could show none).
+        // Let's show all until search is executed.
+        if (aiResultIds === null) return true;
+        return aiResultIds.includes(item.id);
+    } else {
+        // Normal string matching
+        const term = searchTerm.toLowerCase();
+        const contentText = stripHtml(item.content).toLowerCase();
+        const matchesSearch = item.title.toLowerCase().includes(term) || 
+                              item.tags.some(t => t.toLowerCase().includes(term)) ||
+                              contentText.includes(term);
+        return matchesSearch;
+    }
   });
 
   // Effect to sync content to editor div when opening existing item/draft
@@ -475,18 +516,51 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Filters & Search */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+        {/* Search Bar */}
+        <div className={`relative flex-1 transition-all duration-300 ${isAiSearchMode ? 'ring-2 ring-purple-500 rounded-lg shadow-sm' : ''}`}>
+          {isAiSearchMode ? (
+             <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 text-purple-500 animate-pulse" size={18} />
+          ) : (
+             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          )}
+          
           <input 
             type="text" 
-            placeholder="제목, 태그, 내용 검색..."
+            placeholder={isAiSearchMode ? "AI 검색: 기억나는 내용이나 상황을 설명해보세요..." : "제목, 태그, 내용 검색..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            onKeyDown={handleKeyDown}
+            className={`w-full pl-10 pr-24 py-2 border rounded-lg outline-none transition-all ${
+                isAiSearchMode 
+                ? 'border-purple-200 bg-purple-50 focus:bg-white text-purple-900 placeholder:text-purple-300' 
+                : 'border-gray-300 focus:ring-2 focus:ring-blue-500'
+            }`}
           />
+
+          <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1">
+             {isAiSearchMode && (
+                 <button
+                    onClick={handleAiSearch}
+                    disabled={isAiSearching || !searchTerm}
+                    className="p-1.5 bg-purple-600 text-white rounded-md text-xs font-bold hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                 >
+                     {isAiSearching ? <Loader2 className="animate-spin" size={14}/> : '검색'}
+                 </button>
+             )}
+             
+             <button
+                onClick={() => setIsAiSearchMode(!isAiSearchMode)}
+                className={`p-1.5 rounded-md transition-colors ${isAiSearchMode ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-purple-600 hover:bg-purple-50'}`}
+                title={isAiSearchMode ? "AI 검색 끄기" : "AI 의미 기반 검색 켜기"}
+             >
+                 {isAiSearchMode ? <RotateCcw size={16} /> : <Sparkles size={16} />}
+             </button>
+          </div>
         </div>
+
+        {/* Category Filters */}
         <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
           <button 
             onClick={() => setSelectedCategory('ALL')}
@@ -507,7 +581,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
       </div>
 
       {/* Grid Content */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-4 custom-scrollbar">
         {filteredItems.map(item => (
           <div 
             key={item.id} 
@@ -521,6 +595,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
             className={`
                 bg-white rounded-xl p-5 shadow-sm border hover:shadow-md transition-all cursor-pointer flex flex-col h-64 group relative
                 ${item.isDraft ? 'border-dashed border-blue-300 bg-blue-50/10' : 'border-gray-100'}
+                ${isAiSearchMode && aiResultIds && aiResultIds.includes(item.id) ? 'ring-2 ring-purple-100' : ''}
             `}
           >
             {item.isDraft && (
@@ -568,8 +643,18 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
         ))}
         {filteredItems.length === 0 && (
           <div className="col-span-full flex flex-col items-center justify-center py-20 text-gray-400">
-            <BookOpen size={48} className="opacity-20 mb-4" />
-            <p>저장된 지식이 없습니다. 새로운 기록을 추가해보세요!</p>
+            {isAiSearchMode && aiResultIds !== null ? (
+                <>
+                    <Sparkles size={48} className="text-purple-200 mb-4" />
+                    <p className="text-purple-400 font-medium">AI가 관련 내용을 찾지 못했습니다.</p>
+                    <p className="text-xs text-gray-400 mt-1">다른 키워드로 검색해보세요.</p>
+                </>
+            ) : (
+                <>
+                    <BookOpen size={48} className="opacity-20 mb-4" />
+                    <p>{searchTerm ? '검색 결과가 없습니다.' : '저장된 지식이 없습니다. 새로운 기록을 추가해보세요!'}</p>
+                </>
+            )}
           </div>
         )}
       </div>

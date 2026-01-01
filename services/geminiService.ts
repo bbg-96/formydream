@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { AIBreakdownResponse } from "../types";
+import { AIBreakdownResponse, KnowledgeItem } from "../types";
 
 // Helper to get the API client with the latest key
 const getAIClient = (): GoogleGenAI | null => {
@@ -70,6 +70,67 @@ export const generateTaskBreakdown = async (taskTitle: string, taskDescription: 
     console.error("Error generating task breakdown:", error);
     return null;
   }
+};
+
+export const searchKnowledgeBaseWithAI = async (query: string, items: KnowledgeItem[]): Promise<string[]> => {
+    try {
+        const ai = getAIClient();
+        if (!ai) return [];
+        if (items.length === 0) return [];
+
+        const model = "gemini-3-flash-preview";
+        
+        // Prepare simplified items list to save tokens, stripping HTML
+        const itemsContext = items.map(item => {
+            const cleanContent = item.content.replace(/<[^>]*>/g, '').substring(0, 300); // Limit content length
+            return `ID: ${item.id}\nTitle: ${item.title}\nCategory: ${item.category}\nTags: ${item.tags.join(', ')}\nSnippet: ${cleanContent}\n---`;
+        }).join('\n');
+
+        const schema: Schema = {
+            type: Type.OBJECT,
+            properties: {
+                relevantIds: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "List of Knowledge Item IDs that are relevant to the user query.",
+                }
+            },
+            required: ["relevantIds"]
+        };
+
+        const prompt = `
+            You are a smart search engine for a Cloud DevOps Knowledge Base.
+            
+            User Query: "${query}"
+            
+            Here is the list of knowledge items:
+            ${itemsContext}
+            
+            Analyze the user query and the knowledge items. 
+            Return the IDs of items that are semantically relevant to the query.
+            If the query is vague, select items that might be helpful.
+            If nothing matches, return an empty array.
+        `;
+
+        const response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: schema,
+            }
+        });
+
+        const text = response.text;
+        if (!text) return [];
+
+        const result = JSON.parse(text);
+        return result.relevantIds || [];
+
+    } catch (e) {
+        console.error("AI Search Error", e);
+        return [];
+    }
 };
 
 export const chatWithAssistant = async (message: string, context: string): Promise<string> => {
