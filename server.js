@@ -192,7 +192,8 @@ app.post('/api/mail/connect', async (req, res) => {
         timeout: 5000,
         tlsOptions: { rejectUnauthorized: false }
       });
-      await pop3.UIDL();
+      // Force STAT to ensure mailbox is refreshed
+      await pop3.STAT();
       await pop3.QUIT();
       res.json({ success: true });
     } else {
@@ -218,6 +219,9 @@ app.post('/api/mail/messages', async (req, res) => {
     let emails = [];
     let newLatestUid = lastUid;
 
+    // Use specific check for "Initial" because lastUid could be empty string/0 which are valid states
+    const isInitialSync = (lastUid === undefined || lastUid === null);
+
     if (protocol === 'IMAP') {
       const imapConfig = {
         imap: {
@@ -236,45 +240,71 @@ app.post('/api/mail/messages', async (req, res) => {
       
       const total = connection.box.messages.total;
       
-      // === Case 1: Initial Connection (No lastUid) ===
-      if (!lastUid) {
-          // Just get the last message's UID to set the cursor
+      // === Case 1: Initial Connection ===
+      if (isInitialSync) {
+          // Fetch last 10 messages for context
+          const fetchCount = 10;
           if (total > 0) {
-              // Fetch only HEADER of the last message to be fast
-              const lastMsg = await connection.fetch(`${total}:${total}`, { 
-                  bodies: 'HEADER', 
-                  markSeen: false 
+              const fetchStart = Math.max(1, total - fetchCount + 1);
+              console.log(`[IMAP] Initial sync. Fetching ${fetchStart}:${total}`);
+              const messages = await connection.fetch(`${fetchStart}:${total}`, {
+                  bodies: ['HEADER', 'TEXT'],
+                  markSeen: false,
+                  struct: true
               });
-              if (lastMsg && lastMsg.length > 0) {
-                  newLatestUid = lastMsg[0].attributes.uid;
+              
+              if (messages.length > 0) {
+                  // Process and add to emails list (copied logic from below)
+                  const parsePromises = messages.map(async (item) => {
+                      const uid = item.attributes.uid;
+                      const numericUid = Number(uid);
+                      const currentMax = Number(newLatestUid) || 0;
+                      if (!newLatestUid || numericUid > currentMax) newLatestUid = uid;
+                      
+                      const all = item.parts.find(p => p.which === 'TEXT');
+                      const idHeader = "Imap-Id: " + uid + "\r\n";
+                      try {
+                        const parsed = await simpleParser(idHeader + (all.body || ""));
+                        return {
+                            id: `imap-${uid}`,
+                            senderName: parsed.from?.text || 'Unknown',
+                            senderAddress: parsed.from?.value?.[0]?.address || '',
+                            subject: parsed.subject || '(No Subject)',
+                            body: parsed.text || '(No Content)',
+                            receivedAt: parsed.date ? parsed.date.toISOString() : new Date().toISOString(),
+                            isRead: item.attributes.flags && item.attributes.flags.includes('\\Seen')
+                        };
+                      } catch (e) { return null; }
+                  });
+                  const results = await Promise.all(parsePromises);
+                  emails = results.filter(e => e !== null);
               }
           } else {
-              newLatestUid = 0;
+              newLatestUid = 'EMPTY_MAILBOX';
           }
-          // We return EMPTY emails list, just the UID.
-          console.log(`[IMAP] Initial sync. Max UID: ${newLatestUid}. No emails fetched.`);
-      
       } 
-      // === Case 2: Refresh (Has lastUid) ===
+      // === Case 2: Refresh ===
       else {
           console.log(`[IMAP] Incremental sync. Fetching UID > ${lastUid}`);
+          let searchCriteria = [['UID', `${Number(lastUid) + 1}:*`]];
           
-          // Search for UIDs strictly greater than lastUid
-          const searchCriteria = [['UID', `${Number(lastUid) + 1}:*`]];
-          
-          // Use imap-simple search
+          if (lastUid === 'EMPTY_MAILBOX') {
+             searchCriteria = [['ALL']];
+          }
+
           const messages = await connection.search(searchCriteria, {
               bodies: ['HEADER', 'TEXT'],
               markSeen: false,
               struct: true
           });
 
-          // Process the new messages
           if (messages.length > 0) {
               const parsePromises = messages.map(async (item) => {
                   const uid = item.attributes.uid;
-                  // Update max UID
-                  if (!newLatestUid || uid > newLatestUid) {
+                  const numericUid = Number(uid);
+                  const currentMax = Number(newLatestUid) || 0;
+                  
+                  if (!newLatestUid || numericUid > currentMax) {
                       newLatestUid = uid;
                   }
 
@@ -316,27 +346,33 @@ app.post('/api/mail/messages', async (req, res) => {
         tlsOptions: { rejectUnauthorized: false }
       });
 
-      // Get full UIDL list: [{ msgNumber: 1, uidl: '...' }, ...]
+      // Update 1: Force STAT to refresh mailbox state
+      await pop3.STAT();
+
       const list = await pop3.UIDL(); 
+      // Update 2: Sort by msgNumber to ensure order
+      list.sort((a, b) => Number(a.msgNumber) - Number(b.msgNumber));
+
+      console.log(`[POP3] UIDL List length: ${list.length}`);
       
-      if (!lastUid) {
-          // Case 1: Initial. Get last UIDL.
+      if (list.length > 0) {
+          const lastActual = list[list.length - 1];
+          const lastActualUid = (typeof lastActual === 'object' && lastActual.uidl) ? lastActual.uidl : lastActual;
+          console.log(`[POP3] Server Latest UIDL is: ${lastActualUid}`);
+      }
+
+      if (isInitialSync) {
+          // Case 1: Initial. Get LAST 10 emails.
           if (list.length > 0) {
-              newLatestUid = list[list.length - 1].uidl;
-          }
-          console.log(`[POP3] Initial sync. Last UIDL: ${newLatestUid}`);
-      } else {
-          // Case 2: Refresh. Find index of lastUid and fetch subsequent.
-          const lastIndex = list.findIndex(item => item.uidl === lastUid);
-          
-          if (lastIndex !== -1 && lastIndex < list.length - 1) {
-              // Fetch from lastIndex + 1 to end
-              // POP3 indexes are 1-based, list is 0-based.
-              // list[lastIndex] is the known one. We want list[lastIndex+1] which is msgNumber (lastIndex+2)
+              const fetchCount = 10;
+              const startIndex = Math.max(0, list.length - fetchCount);
+              console.log(`[POP3] Initial sync. Fetching last ${list.length - startIndex} messages.`);
               
-              for (let i = lastIndex + 1; i < list.length; i++) {
-                  const msgNum = list[i].msgNumber;
-                  const uidl = list[i].uidl;
+              for (let i = startIndex; i < list.length; i++) {
+                  const item = list[i];
+                  const msgNum = item.msgNumber || (i + 1);
+                  const uidl = (typeof item === 'object' && item.uidl) ? item.uidl : item;
+                  
                   try {
                       const raw = await pop3.RETR(msgNum);
                       const parsed = await simpleParser(raw);
@@ -351,14 +387,89 @@ app.post('/api/mail/messages', async (req, res) => {
                         isRead: true 
                       });
                       
-                      // Update latest to current
                       newLatestUid = uidl;
-                  } catch (e) { console.warn('POP3 fetch error', e); }
+                  } catch (e) { console.warn(`POP3 RETR error for msg ${msgNum}:`, e.message); }
               }
-          } else if (lastIndex === -1) {
-              // UIDL not found (maybe deleted?), reset or fetch all?
-              // For safety, let's just fetch the last few or do nothing.
-              // Doing nothing to avoid dups.
+              console.log(`[POP3] Initial sync done. New Cursor: ${newLatestUid}`);
+          } else {
+              newLatestUid = 'EMPTY_MAILBOX';
+              console.log(`[POP3] Initial sync. Mailbox is empty.`);
+          }
+      } else {
+          // Case 2: Refresh. Find index of lastUid and fetch subsequent.
+          console.log(`[POP3] Refreshing. Client has UIDL: ${lastUid}`);
+          
+          let lastIndex = -1;
+          
+          if (lastUid !== 'EMPTY_MAILBOX') {
+             lastIndex = list.findIndex(item => {
+                 const uid = (typeof item === 'object' && item.uidl) ? item.uidl : item;
+                 return String(uid).trim() === String(lastUid).trim();
+             });
+          }
+          
+          if (lastIndex !== -1) {
+              const startIndex = lastIndex + 1;
+              if (startIndex < list.length) {
+                  console.log(`[POP3] Found new messages. Fetching from index ${startIndex} to ${list.length - 1}`);
+                  
+                  for (let i = startIndex; i < list.length; i++) {
+                      const item = list[i];
+                      const msgNum = item.msgNumber || (i + 1);
+                      const uidl = item.uidl || item;
+                      
+                      try {
+                          const raw = await pop3.RETR(msgNum);
+                          const parsed = await simpleParser(raw);
+                          
+                          emails.push({
+                            id: `pop3-${msgNum}`,
+                            senderName: parsed.from?.text || 'Unknown',
+                            senderAddress: parsed.from?.value?.[0]?.address || '',
+                            subject: parsed.subject || '(No Subject)',
+                            body: parsed.text || '(No Content)',
+                            receivedAt: parsed.date ? parsed.date.toISOString() : new Date().toISOString(),
+                            isRead: true 
+                          });
+                          
+                          // Update latest to current
+                          newLatestUid = uidl;
+                      } catch (e) { console.warn(`POP3 RETR error for msg ${msgNum}:`, e.message); }
+                  }
+              } else {
+                  console.log(`[POP3] No new messages found (Index at end).`);
+              }
+          } else if (lastUid !== 'EMPTY_MAILBOX') {
+               // UID not found. Sync lost.
+               // HEALING: Fetch last 10 messages so user sees something and sync is restored.
+               console.warn('[POP3] Last UID not found. Sync lost. Fetching last 10 messages to heal.');
+               
+               const fetchCount = 10;
+               const startIndex = Math.max(0, list.length - fetchCount);
+               
+               if (list.length > 0) {
+                    for (let i = startIndex; i < list.length; i++) {
+                        const item = list[i];
+                        const msgNum = item.msgNumber || (i + 1);
+                        const uidl = (typeof item === 'object' && item.uidl) ? item.uidl : item;
+                        try {
+                            const raw = await pop3.RETR(msgNum);
+                            const parsed = await simpleParser(raw);
+                            emails.push({
+                                id: `pop3-${msgNum}`,
+                                senderName: parsed.from?.text || 'Unknown',
+                                senderAddress: parsed.from?.value?.[0]?.address || '',
+                                subject: parsed.subject || '(No Subject)',
+                                body: parsed.text || '(No Content)',
+                                receivedAt: parsed.date ? parsed.date.toISOString() : new Date().toISOString(),
+                                isRead: true 
+                            });
+                            newLatestUid = uidl;
+                        } catch (e) { console.warn(`POP3 healing error:`, e.message); }
+                    }
+               } else {
+                   newLatestUid = 'EMPTY_MAILBOX';
+               }
           }
       }
 
@@ -368,7 +479,11 @@ app.post('/api/mail/messages', async (req, res) => {
     // Sort Newest First (locally for the chunk)
     emails.sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt));
 
-    // Return object
+    // Fallback if still undefined
+    if (newLatestUid === undefined || newLatestUid === null) {
+        newLatestUid = 'EMPTY_MAILBOX';
+    }
+
     res.json({
         emails: emails,
         latestUid: newLatestUid

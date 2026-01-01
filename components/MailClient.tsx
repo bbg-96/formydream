@@ -72,15 +72,14 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks, mailAcco
     const success = await api.mail.connect(user.id, mailConfig);
     
     if (success) {
-      // 2. Initial Sync (Get Last UID only, No Emails)
-      // Pass 'undefined' for lastUid to trigger initial mode
+      // 2. Initial Sync (Get Last 10 emails & Last UID)
       const { emails, latestUid } = await api.mail.getMessages(user.id, mailConfig, undefined);
       
       const newAccount: MailAccount = {
         id: `acc-${Date.now()}`,
         name: accountAlias || mailConfig.email,
         config: mailConfig,
-        emails: [], // Start empty as requested
+        emails: emails, // Use fetched emails instead of empty array
         latestUid: latestUid, 
         lastUpdated: new Date(),
         isConnected: true
@@ -343,10 +342,9 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks, mailAcco
                             <div className="bg-indigo-50 p-4 rounded-full mb-3 animate-pulse">
                                 <BellRing size={24} className="text-indigo-500" />
                             </div>
-                            <h4 className="font-bold text-gray-700 text-sm">최신 메일 대기 중</h4>
+                            <h4 className="font-bold text-gray-700 text-sm">메일함이 비어있거나 동기화 중입니다.</h4>
                             <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                                기존 메일은 불러오지 않았습니다.<br/>
-                                새로 도착하는 메일만 이곳에 표시됩니다.
+                                잠시 후 새로고침 버튼을 눌러보세요.
                             </p>
                             <button 
                                 onClick={refreshCurrentAccount} 
