@@ -26,7 +26,7 @@ pool.connect(async (err, client, release) => {
   } else {
     console.log('>>> Database Connected Successfully to 10.200.0.159');
     
-    // Auto-create memos table if not exists (Updated with x, y)
+    // Auto-create memos table if not exists (Updated with x, y, width, height)
     try {
         await client.query(`
             CREATE TABLE IF NOT EXISTS memos (
@@ -36,9 +36,20 @@ pool.connect(async (err, client, release) => {
                 color VARCHAR(20),
                 x INTEGER DEFAULT 0,
                 y INTEGER DEFAULT 0,
+                width INTEGER DEFAULT 280,
+                height INTEGER DEFAULT 280,
                 created_at TIMESTAMP
             )
         `);
+        
+        // Add columns if they don't exist (Migration for existing tables)
+        try {
+            await client.query(`ALTER TABLE memos ADD COLUMN IF NOT EXISTS width INTEGER DEFAULT 280`);
+            await client.query(`ALTER TABLE memos ADD COLUMN IF NOT EXISTS height INTEGER DEFAULT 280`);
+        } catch (alterErr) {
+            console.log('Columns already exist or alter failed');
+        }
+
         console.log('>>> Memos Table Ready');
     } catch(tableErr) {
         console.error('Failed to create memos table', tableErr);
@@ -208,6 +219,8 @@ app.get('/api/memos', async (req, res) => {
             color: row.color,
             x: row.x || 0,
             y: row.y || 0,
+            width: row.width || 280,
+            height: row.height || 280,
             createdAt: row.created_at
         }));
         res.json(formatted);
@@ -218,14 +231,14 @@ app.get('/api/memos', async (req, res) => {
 });
 
 app.post('/api/memos', async (req, res) => {
-    const { id, userId, content, color, x, y, createdAt } = req.body;
+    const { id, userId, content, color, x, y, width, height, createdAt } = req.body;
     try {
         await pool.query(
-            `INSERT INTO memos (id, user_id, content, color, x, y, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+            `INSERT INTO memos (id, user_id, content, color, x, y, width, height, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
              ON CONFLICT (id) DO UPDATE SET
-               content=$3, color=$4, x=$5, y=$6`,
-            [id, userId, content, color, x || 0, y || 0, createdAt]
+               content=$3, color=$4, x=$5, y=$6, width=$7, height=$8`,
+            [id, userId, content, color, x || 0, y || 0, width || 280, height || 280, createdAt]
         );
         res.json({ success: true });
     } catch(err) {

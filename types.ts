@@ -53,8 +53,10 @@ export interface Memo {
   content: string;
   color: 'YELLOW' | 'BLUE' | 'GREEN' | 'PINK' | 'PURPLE';
   createdAt: string;
-  x?: number; // Optional: for future drag & drop
+  x?: number; 
   y?: number;
+  width?: number; // Added for resizing
+  height?: number; // Added for resizing
 }
 
 export interface Email {

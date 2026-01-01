@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, StickyNote, Save, Check } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, StickyNote, Check, GripHorizontal } from 'lucide-react';
 import { Memo } from '../types';
 import { api } from '../services/api';
 
@@ -37,6 +37,8 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
       color: 'YELLOW',
       x: 0,
       y: 0,
+      width: 280,
+      height: 280,
       createdAt: new Date().toISOString()
     };
     // Add locally immediately
@@ -66,13 +68,13 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
         await api.memos.save(userId, updatedMemo);
     } catch (e) {
         console.error("Failed to save memo", e);
-        // Optionally revert state here if strict consistency is needed
     }
   };
 
   const MemoCard: React.FC<{ memo: Memo }> = ({ memo }) => {
       const [localContent, setLocalContent] = useState(memo.content);
       const [isFocused, setIsFocused] = useState(false);
+      const memoRef = useRef<HTMLDivElement>(null);
 
       useEffect(() => {
           setLocalContent(memo.content);
@@ -85,10 +87,52 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
           }
       };
 
+      // --- Resize Logic ---
+      const handleResizeStart = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startWidth = memo.width || 280;
+        const startHeight = memo.height || 280;
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            const newWidth = Math.max(200, startWidth + (moveEvent.clientX - startX));
+            const newHeight = Math.max(200, startHeight + (moveEvent.clientY - startY));
+            
+            // Just update local DOM for smooth performance without re-rendering React state constantly
+            if (memoRef.current) {
+                memoRef.current.style.width = `${newWidth}px`;
+                memoRef.current.style.height = `${newHeight}px`;
+            }
+        };
+
+        const handleMouseUp = (upEvent: MouseEvent) => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            
+            const newWidth = Math.max(200, startWidth + (upEvent.clientX - startX));
+            const newHeight = Math.max(200, startHeight + (upEvent.clientY - startY));
+
+            handleUpdate(memo.id, { width: newWidth, height: newHeight });
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+      };
+
       return (
-        <div className={`relative p-5 rounded-lg shadow-md border ${COLORS[memo.color as keyof typeof COLORS]} h-64 flex flex-col transition-transform hover:-translate-y-1 hover:shadow-lg animate-fade-in group`}>
-            {/* Color Picker */}
-            <div className="flex justify-between items-start mb-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2 left-4">
+        <div 
+            ref={memoRef}
+            style={{ 
+                width: memo.width || 280, 
+                height: memo.height || 280 
+            }}
+            className={`relative p-5 rounded-lg shadow-md border ${COLORS[memo.color as keyof typeof COLORS]} flex flex-col transition-shadow hover:shadow-xl animate-fade-in group shrink-0`}
+        >
+            {/* Color Picker & Delete */}
+            <div className="flex justify-between items-start mb-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2 left-4 z-10">
                 <div className="flex gap-1 bg-white/50 p-1 rounded-full backdrop-blur-sm">
                     {Object.keys(COLORS).map((c) => (
                         <button
@@ -115,9 +159,19 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
                 placeholder="내용을 입력하세요..."
             />
             
-            <div className="absolute bottom-3 right-3 text-[10px] text-gray-500 flex items-center gap-1">
+            {/* Status Indicator */}
+            <div className="absolute bottom-3 left-4 text-[10px] text-gray-500 flex items-center gap-1 pointer-events-none">
                 {isFocused && <span className="text-blue-600 animate-pulse">작성 중...</span>}
                 {!isFocused && localContent === memo.content && <span className="text-green-600 flex items-center gap-1"><Check size={10}/> Saved</span>}
+            </div>
+
+            {/* Resize Handle */}
+            <div 
+                onMouseDown={handleResizeStart}
+                className="absolute bottom-1 right-1 p-2 cursor-se-resize text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                title="크기 조절"
+            >
+                <GripHorizontal size={16} className="-rotate-45" />
             </div>
         </div>
       );
@@ -143,12 +197,13 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 p-1">
+        {/* Changed from Grid to Flex Wrap to support variable sizing */}
+        <div className="flex flex-wrap items-start content-start gap-6 p-2 min-h-[500px]">
             {memos.map(memo => (
                 <MemoCard key={memo.id} memo={memo} />
             ))}
             {memos.length === 0 && !loading && (
-                 <div className="col-span-full flex flex-col items-center justify-center h-64 text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
+                 <div className="w-full h-64 flex flex-col items-center justify-center text-gray-400 border-2 border-dashed border-gray-200 rounded-xl">
                     <StickyNote size={48} className="mb-2 opacity-20" />
                     <p>작성된 메모가 없습니다.</p>
                  </div>
