@@ -231,21 +231,24 @@ app.post('/api/mail/messages', async (req, res) => {
       const connection = await imaps.connect(imapConfig);
       await connection.openBox('INBOX');
       
-      const searchCriteria = ['ALL'];
+      // OPTIMIZATION for Large Mailboxes:
+      // Use SINCE criteria to fetch only emails from the last 30 days.
+      // Searching 'ALL' on a large mailbox often returns a truncated list of OLD emails due to server limits.
+      const date = new Date();
+      date.setDate(date.getDate() - 30); // Last 30 days
+      const searchCriteria = [['SINCE', date]];
       
-      // OPTIMIZATION:
-      // 1. Fetch metadata (UIDs) only first. This is fast even for thousands of emails.
-      const allMessages = await connection.search(searchCriteria, { bodies: [] });
+      // 1. Fetch metadata (UIDs) only first.
+      const recentMessages = await connection.search(searchCriteria, { bodies: [] });
       
-      // 2. Sort by UID ascending (Oldest -> Newest)
-      // This ensures we have the correct order before slicing
-      allMessages.sort((a, b) => a.attributes.uid - b.attributes.uid);
+      // 2. Sort by UID ascending (Oldest -> Newest within the filtered set)
+      recentMessages.sort((a, b) => a.attributes.uid - b.attributes.uid);
       
       // 3. Take last 50 (The newest 50)
-      const recentMessages = allMessages.slice(-50);
+      const targetMessages = recentMessages.slice(-50);
       
       // 4. Fetch the actual content only for these 50
-      const uids = recentMessages.map(m => m.attributes.uid);
+      const uids = targetMessages.map(m => m.attributes.uid);
       
       if (uids.length > 0) {
           const fetchOptions = {
