@@ -378,10 +378,13 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
 
   const filteredMemosList = getFilteredMemos();
 
-  // Calculate canvas size to allow scrolling if memos are far out
-  // But also enforce a minimum size
-  const maxWidth = memos.reduce((max, m) => Math.max(max, (m.x || 0) + (m.width || 280) + 200), 2000);
-  const maxHeight = memos.reduce((max, m) => Math.max(max, (m.y || 0) + (m.height || 280) + 200), 1600);
+  // Calculate canvas size.
+  // Instead of a hard minimum of 2000px/1600px which forces scrollbars,
+  // we calculate the actual max extent of memos.
+  // We use CSS min-width/min-height: 100% on the container to ensure it fills the screen
+  // even if content is small, but it will shrink back to 100% when memos are deleted.
+  const contentMaxX = memos.reduce((max, m) => Math.max(max, (m.x || 0) + (m.width || 280) + 100), 0);
+  const contentMaxY = memos.reduce((max, m) => Math.max(max, (m.y || 0) + (m.height || 280) + 100), 0);
 
   return (
     <div className="h-full flex flex-col p-6 overflow-hidden relative">
@@ -420,10 +423,11 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
             className="flex-1 relative overflow-auto bg-gray-50/50 rounded-xl border border-dashed border-gray-200 shadow-inner scroll-smooth"
           >
             <div 
-                className="relative"
+                className="relative min-w-full min-h-full transition-all duration-300 ease-out"
                 style={{ 
-                    width: `${maxWidth}px`, 
-                    height: `${maxHeight}px` 
+                    // If content extends beyond viewport, use that size. Otherwise, min-w/h-full handles it.
+                    width: contentMaxX > 0 ? `${contentMaxX}px` : '100%',
+                    height: contentMaxY > 0 ? `${contentMaxY}px` : '100%'
                 }}
             >
                 {memos.map(memo => (
