@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote, ChevronUp, ChevronDown } from 'lucide-react';
 import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem, User, MailAccount } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TaskBoard } from './components/TaskBoard';
@@ -106,6 +106,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewMode>('DASHBOARD');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
+  const [showHeader, setShowHeader] = useState(true);
   
   // Mail State (Lifted Up) with Persistence
   const [mailAccounts, setMailAccounts] = useState<MailAccount[]>([]);
@@ -216,7 +217,16 @@ const App: React.FC = () => {
           <SidebarItem view="AI_CHAT" icon={<Bot size={20} />} label="AI 어시스턴트" />
         </nav>
 
-        <div className="p-4 border-t border-slate-700">
+        <div className="p-4 border-t border-slate-700 space-y-2">
+          <button 
+            onClick={() => setShowHeader(!showHeader)}
+            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors w-full px-4 py-2"
+            title={showHeader ? '상단바 숨기기' : '상단바 보이기'}
+          >
+            {showHeader ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            <span className="text-sm">{showHeader ? '상단바 숨기기' : '상단바 보이기'}</span>
+          </button>
+
           <button 
             onClick={handleLogout}
             className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors w-full px-4 py-2"
@@ -230,36 +240,38 @@ const App: React.FC = () => {
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-8 shadow-sm z-10">
-          <h2 className="text-xl font-bold text-gray-800">
-            {currentView === 'DASHBOARD' && 'Dashboard'}
-            {currentView === 'TASKS' && 'Task Board'}
-            {currentView === 'SCHEDULE' && 'Schedule'}
-            {currentView === 'MAIL' && 'Mail Inbox'}
-            {currentView === 'MEMO' && 'Quick Sticky Notes'}
-            {currentView === 'KNOWLEDGE' && 'Knowledge Base'}
-            {currentView === 'AI_CHAT' && 'AI Support'}
-            {currentView === 'MY_PAGE' && 'My Page'}
-          </h2>
-          <div className="flex items-center gap-4">
-            <div 
-              className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 p-1.5 pr-4 rounded-full transition-colors group"
-              onClick={() => setCurrentView('MY_PAGE')}
-              title="마이페이지 / 설정"
-            >
-              <div className="text-right hidden sm:block">
-                <p className="text-sm font-semibold text-gray-700 group-hover:text-blue-600 transition-colors">{user.name}</p>
-                <p className="text-xs text-gray-500">{user.role}</p>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center text-slate-600 font-bold overflow-hidden relative">
-                {user.name.charAt(0).toUpperCase()}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                    <Settings size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+        {showHeader && (
+          <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-8 shadow-sm z-10 transition-all">
+            <h2 className="text-xl font-bold text-gray-800">
+              {currentView === 'DASHBOARD' && 'Dashboard'}
+              {currentView === 'TASKS' && 'Task Board'}
+              {currentView === 'SCHEDULE' && 'Schedule'}
+              {currentView === 'MAIL' && 'Mail Inbox'}
+              {currentView === 'MEMO' && 'Quick Sticky Notes'}
+              {currentView === 'KNOWLEDGE' && 'Knowledge Base'}
+              {currentView === 'AI_CHAT' && 'AI Support'}
+              {currentView === 'MY_PAGE' && 'My Page'}
+            </h2>
+            <div className="flex items-center gap-4">
+              <div 
+                className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 p-1.5 pr-4 rounded-full transition-colors group"
+                onClick={() => setCurrentView('MY_PAGE')}
+                title="마이페이지 / 설정"
+              >
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-semibold text-gray-700 group-hover:text-blue-600 transition-colors">{user.name}</p>
+                  <p className="text-xs text-gray-500">{user.role}</p>
+                </div>
+                <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center text-slate-600 font-bold overflow-hidden relative">
+                  {user.name.charAt(0).toUpperCase()}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                      <Settings size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         {/* View Content */}
         <div className="flex-1 overflow-auto bg-gray-50/50 p-2 sm:p-4">
