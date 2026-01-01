@@ -69,8 +69,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
         {/* Status Chart */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-lg font-semibold mb-4 text-gray-700">작업 상태 현황</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <PieChart>
                 <Pie
                   data={statusCounts}
@@ -96,8 +96,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
         {/* Priority Chart */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="text-lg font-semibold mb-4 text-gray-700">우선순위 분포</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
               <BarChart data={priorityCounts}>
                 <XAxis dataKey="name" />
                 <YAxis />
