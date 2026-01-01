@@ -58,6 +58,24 @@ export interface Email {
   isRead: boolean;
 }
 
+export interface MailConfig {
+  protocol: 'IMAP' | 'POP3';
+  host: string;
+  port: string;
+  useSSL: boolean;
+  email: string;
+  password: string;
+}
+
+export interface MailAccount {
+  id: string;
+  name: string; // e.g. "Work", "Personal"
+  config: MailConfig;
+  emails: Email[];
+  lastUpdated: Date;
+  isConnected: boolean;
+}
+
 export interface AIBreakdownResponse {
   subtasks: string[];
   suggestedTags: string[];

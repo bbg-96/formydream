@@ -240,7 +240,8 @@ app.post('/api/mail/messages', async (req, res) => {
       
       // Fetch last 50 messages
       const messages = await connection.search(searchCriteria, fetchOptions);
-      const recentMessages = messages.slice(-50).reverse();
+      // Slice last 50
+      const recentMessages = messages.slice(-50);
 
       for (const item of recentMessages) {
         const all = item.parts.find(p => p.which === 'TEXT');
@@ -293,6 +294,9 @@ app.post('/api/mail/messages', async (req, res) => {
       }
       await pop3.QUIT();
     }
+
+    // Explicit Sort: Newest First
+    emails.sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt));
 
     res.json(emails);
   } catch (error) {

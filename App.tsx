@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, Mail } from 'lucide-react';
-import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem, User } from './types';
+import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem, User, MailAccount } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TaskBoard } from './components/TaskBoard';
 import { GeminiChat } from './components/GeminiChat';
@@ -92,6 +92,9 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewMode>('DASHBOARD');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
+  
+  // Mail State (Lifted Up)
+  const [mailAccounts, setMailAccounts] = useState<MailAccount[]>([]);
 
   useEffect(() => {
     // Check local storage for existing session
@@ -132,6 +135,7 @@ const App: React.FC = () => {
     setCurrentView('DASHBOARD');
     setTasks([]);
     setKnowledgeItems([]);
+    setMailAccounts([]); // Clear mail session on logout
   };
 
   // Layout Components
@@ -226,7 +230,14 @@ const App: React.FC = () => {
           {currentView === 'TASKS' && <TaskBoard tasks={tasks} setTasks={setTasks} />}
           {currentView === 'AI_CHAT' && <GeminiChat tasks={tasks} />}
           {currentView === 'SCHEDULE' && <Schedule tasks={tasks} />}
-          {currentView === 'MAIL' && <MailClient user={user} setTasks={setTasks} />}
+          {currentView === 'MAIL' && (
+            <MailClient 
+              user={user} 
+              setTasks={setTasks} 
+              mailAccounts={mailAccounts} 
+              setMailAccounts={setMailAccounts} 
+            />
+          )}
           {currentView === 'KNOWLEDGE' && <KnowledgeBase items={knowledgeItems} setItems={setKnowledgeItems} />}
           {currentView === 'MY_PAGE' && <MyPage user={user} />}
         </div>
