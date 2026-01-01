@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { User as UserIcon, Mail, Shield, Key, Check, AlertCircle, Loader2, CheckCircle } from 'lucide-react';
+import { User as UserIcon, Mail, Shield, Key, Check, AlertCircle, Loader2, CheckCircle, Sparkles, Eye, EyeOff } from 'lucide-react';
 import { api } from '../services/api';
 
 interface MyPageProps {
@@ -8,44 +8,70 @@ interface MyPageProps {
 }
 
 export const MyPage: React.FC<MyPageProps> = ({ user }) => {
+  // Password Change State
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
+  const [passwordMessage, setPasswordMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // API Key State
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [apiMessage, setApiMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    // Load saved API Key on mount
+    const savedKey = localStorage.getItem('gemini_api_key');
+    if (savedKey) setApiKey(savedKey);
+  }, []);
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage(null);
+    setPasswordMessage(null);
 
     if (newPassword.length < 6) {
-      setMessage({ type: 'error', text: '비밀번호는 최소 6자 이상이어야 합니다.' });
+      setPasswordMessage({ type: 'error', text: '비밀번호는 최소 6자 이상이어야 합니다.' });
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setMessage({ type: 'error', text: '비밀번호가 일치하지 않습니다.' });
+      setPasswordMessage({ type: 'error', text: '비밀번호가 일치하지 않습니다.' });
       return;
     }
 
-    setIsLoading(true);
+    setIsPasswordLoading(true);
     try {
       await api.auth.updatePassword(user.id, newPassword);
-      setMessage({ type: 'success', text: '비밀번호가 성공적으로 변경되었습니다.' });
+      setPasswordMessage({ type: 'success', text: '비밀번호가 성공적으로 변경되었습니다.' });
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
-      setMessage({ type: 'error', text: error.message || '비밀번호 변경에 실패했습니다.' });
+      setPasswordMessage({ type: 'error', text: error.message || '비밀번호 변경에 실패했습니다.' });
     } finally {
-      setIsLoading(false);
+      setIsPasswordLoading(false);
     }
+  };
+
+  const handleSaveApiKey = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!apiKey.trim()) {
+          localStorage.removeItem('gemini_api_key');
+          setApiMessage({ type: 'success', text: 'API 키가 삭제되었습니다.' });
+      } else {
+          localStorage.setItem('gemini_api_key', apiKey.trim());
+          setApiMessage({ type: 'success', text: 'API 키가 저장되었습니다.' });
+      }
+      
+      // Clear message after 3 seconds
+      setTimeout(() => setApiMessage(null), 3000);
   };
 
   const isMismatch = confirmPassword && newPassword !== confirmPassword;
   const isMatch = confirmPassword && newPassword === confirmPassword;
 
   return (
-    <div className="p-6 max-w-4xl mx-auto animate-fade-in">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+    <div className="p-6 max-w-4xl mx-auto animate-fade-in space-y-6">
+      <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
         <div className="bg-slate-800 p-2 rounded-lg text-white">
             <UserIcon size={24} />
         </div>
@@ -135,19 +161,19 @@ export const MyPage: React.FC<MyPageProps> = ({ user }) => {
               )}
             </div>
 
-            {message && (
-              <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                {message.type === 'success' ? <Check size={16} /> : <AlertCircle size={16} />}
-                {message.text}
+            {passwordMessage && (
+              <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${passwordMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                {passwordMessage.type === 'success' ? <Check size={16} /> : <AlertCircle size={16} />}
+                {passwordMessage.text}
               </div>
             )}
 
             <button
               type="submit"
-              disabled={isLoading || !newPassword || !confirmPassword || !!isMismatch}
+              disabled={isPasswordLoading || !newPassword || !confirmPassword || !!isMismatch}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
             >
-              {isLoading && <Loader2 className="animate-spin" size={18} />}
+              {isPasswordLoading && <Loader2 className="animate-spin" size={18} />}
               비밀번호 변경
             </button>
           </form>
@@ -156,6 +182,71 @@ export const MyPage: React.FC<MyPageProps> = ({ user }) => {
              <p>· 비밀번호는 타인에게 노출되지 않도록 주의해주세요.</p>
              <p className="mt-1">· 변경된 비밀번호는 즉시 적용되며 다음 로그인 시 사용해야 합니다.</p>
           </div>
+        </div>
+
+        {/* AI Settings Card */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 md:col-span-2">
+            <h3 className="text-lg font-semibold text-gray-800 mb-6 border-b border-gray-100 pb-3 flex items-center gap-2">
+                <Sparkles size={20} className="text-purple-600"/>
+                AI 설정 (Gemini API)
+            </h3>
+            
+            <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex-1">
+                    <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+                        CloudOps Mate의 AI 기능을 사용하려면 Google Gemini API 키가 필요합니다.<br/>
+                        키는 브라우저(Local Storage)에만 안전하게 저장되며 서버로 전송되지 않습니다.
+                    </p>
+                    <a 
+                        href="https://aistudio.google.com/app/apikey" 
+                        target="_blank" 
+                        rel="noreferrer"
+                        className="text-xs text-blue-600 hover:underline flex items-center gap-1 mb-4"
+                    >
+                        API 키 발급받기 (Google AI Studio) &rarr;
+                    </a>
+                </div>
+
+                <div className="flex-1">
+                    <form onSubmit={handleSaveApiKey} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Gemini API Key</label>
+                            <div className="relative">
+                                <input 
+                                    type={showApiKey ? "text" : "password"}
+                                    value={apiKey}
+                                    onChange={(e) => setApiKey(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg p-3 pr-10 focus:ring-2 focus:ring-purple-500 outline-none transition-all font-mono text-sm"
+                                    placeholder="AIzaSy..."
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowApiKey(!showApiKey)}
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                    {showApiKey ? <EyeOff size={18}/> : <Eye size={18}/>}
+                                </button>
+                            </div>
+                        </div>
+
+                        {apiMessage && (
+                            <div className={`p-3 rounded-lg text-sm flex items-center gap-2 ${apiMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                                {apiMessage.type === 'success' ? <Check size={16} /> : <AlertCircle size={16} />}
+                                {apiMessage.text}
+                            </div>
+                        )}
+
+                        <div className="flex justify-end">
+                            <button
+                                type="submit"
+                                className="bg-purple-600 hover:bg-purple-700 text-white font-medium px-6 py-2.5 rounded-lg transition-colors shadow-sm"
+                            >
+                                저장하기
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
       </div>
     </div>

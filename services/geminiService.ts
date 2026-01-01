@@ -1,11 +1,23 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { AIBreakdownResponse } from "../types";
 
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
+// Helper to get the API client with the latest key
+const getAIClient = (): GoogleGenAI | null => {
+    const apiKey = localStorage.getItem('gemini_api_key') || process.env.API_KEY;
+    
+    if (!apiKey) {
+        console.warn("Gemini API Key is missing. Please add it in My Page settings.");
+        return null;
+    }
+    
+    return new GoogleGenAI({ apiKey });
+};
 
 export const generateTaskBreakdown = async (taskTitle: string, taskDescription: string): Promise<AIBreakdownResponse | null> => {
   try {
+    const ai = getAIClient();
+    if (!ai) return null;
+
     const model = "gemini-3-flash-preview";
     
     const schema: Schema = {
@@ -62,6 +74,9 @@ export const generateTaskBreakdown = async (taskTitle: string, taskDescription: 
 
 export const chatWithAssistant = async (message: string, context: string): Promise<string> => {
     try {
+        const ai = getAIClient();
+        if (!ai) return "Gemini API 키가 설정되지 않았습니다. 마이페이지에서 키를 등록해주세요.";
+
         const model = "gemini-3-flash-preview";
         const prompt = `
         Context regarding current tasks: ${context}
@@ -79,6 +94,6 @@ export const chatWithAssistant = async (message: string, context: string): Promi
         return response.text || "죄송합니다. 응답을 생성할 수 없습니다.";
     } catch (e) {
         console.error("Chat error", e);
-        return "AI 서비스 연결에 실패했습니다.";
+        return "AI 서비스 연결에 실패했습니다. API 키를 확인해주세요.";
     }
 }
