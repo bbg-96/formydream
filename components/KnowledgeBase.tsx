@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Search, Plus, Tag, BookOpen, X, Hash, Trash2, Image as ImageIcon, ArrowLeft, Save, List, ListOrdered, Indent, Outdent, AlertCircle, FileText, Edit, Sparkles, Loader2, RotateCcw } from 'lucide-react';
 import { KnowledgeItem } from '../types';
 import { api } from '../services/api';
@@ -32,7 +32,7 @@ const getUserId = () => {
 
 export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string | 'ALL'>('ALL');
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
   
   // AI Search State
   const [isAiSearchMode, setIsAiSearchMode] = useState(false);
@@ -57,6 +57,15 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
   const editorRef = useRef<HTMLDivElement>(null);
   const selectionRangeRef = useRef<Range | null>(null);
 
+  // Calculate unique tags from items
+  const allTags = useMemo(() => {
+    const tags = new Set<string>();
+    items.forEach(item => {
+      item.tags.forEach(tag => tags.add(tag));
+    });
+    return Array.from(tags).sort();
+  }, [items]);
+
   // Reset AI Search when mode is toggled off
   useEffect(() => {
     if (!isAiSearchMode) {
@@ -80,9 +89,9 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
   };
 
   const filteredItems = items.filter(item => {
-    // 1. Category Filter (Always applies)
-    const matchesCategory = selectedCategory === 'ALL' || item.category === selectedCategory;
-    if (!matchesCategory) return false;
+    // 1. Tag Filter
+    const matchesTag = selectedTag === null || item.tags.includes(selectedTag);
+    if (!matchesTag) return false;
 
     // 2. Search Logic
     if (isAiSearchMode) {
@@ -560,23 +569,30 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
           </div>
         </div>
 
-        {/* Category Filters */}
-        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
+        {/* Tag Filters (Replaces Category Filters) */}
+        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 items-center">
+            <div className="flex items-center gap-1 text-gray-400 mr-1 shrink-0">
+                <Hash size={16} />
+                <span className="text-xs font-medium">태그:</span>
+            </div>
           <button 
-            onClick={() => setSelectedCategory('ALL')}
-            className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${selectedCategory === 'ALL' ? 'bg-slate-800 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+            onClick={() => setSelectedTag(null)}
+            className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${selectedTag === null ? 'bg-slate-800 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
           >
-            All
+            전체
           </button>
-          {CATEGORIES.map(cat => (
+          {allTags.map(tag => (
              <button 
-               key={cat}
-               onClick={() => setSelectedCategory(cat)}
-               className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${selectedCategory === cat ? 'bg-slate-800 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+               key={tag}
+               onClick={() => setSelectedTag(tag)}
+               className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${selectedTag === tag ? 'bg-slate-800 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
              >
-               {cat}
+               #{tag}
              </button>
           ))}
+          {allTags.length === 0 && (
+              <span className="text-xs text-gray-400 italic px-2">등록된 태그 없음</span>
+          )}
         </div>
       </div>
 
