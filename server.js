@@ -231,43 +231,37 @@ app.post('/api/mail/messages', async (req, res) => {
       const connection = await imaps.connect(imapConfig);
       await connection.openBox('INBOX');
       
-      // OPTIMIZATION for Large Mailboxes:
-      // Use SINCE criteria to fetch only emails from the last 30 days.
-      // Searching 'ALL' on a large mailbox often returns a truncated list of OLD emails due to server limits.
-      const date = new Date();
-      date.setDate(date.getDate() - 30); // Last 30 days
-      const searchCriteria = [['SINCE', date]];
+      // [NEW STRATEGY] 
+      // Instead of searching by date (which fails for large inboxes due to server limits),
+      // we fetch by Sequence Number.
+      // 'box.messages.total' gives the count. The last numbers are the newest.
+      const total = connection.box.messages.total;
       
-      // 1. Fetch metadata (UIDs) only first.
-      const recentMessages = await connection.search(searchCriteria, { bodies: [] });
-      
-      // 2. Sort by UID ascending (Oldest -> Newest within the filtered set)
-      recentMessages.sort((a, b) => a.attributes.uid - b.attributes.uid);
-      
-      // 3. Take last 50 (The newest 50)
-      const targetMessages = recentMessages.slice(-50);
-      
-      // 4. Fetch the actual content only for these 50
-      const uids = targetMessages.map(m => m.attributes.uid);
-      
-      if (uids.length > 0) {
+      if (total > 0) {
+          // Fetch last 50 messages (e.g., "1050:1100")
+          const start = Math.max(1, total - 49);
+          const range = `${start}:${total}`;
+          
           const fetchOptions = {
             bodies: ['HEADER', 'TEXT'],
             markSeen: false,
             struct: true
           };
-          // Search/Fetch using the specific UID list
-          const messages = await connection.search([['UID', ...uids]], fetchOptions);
+          
+          // Use 'fetch' directly with range, bypassing 'search'
+          const messages = await connection.fetch(range, fetchOptions);
           
           for (const item of messages) {
             const all = item.parts.find(p => p.which === 'TEXT');
             const id = item.attributes.uid;
-            const idHeader = "Imap-Id: "+id + "\r\n";
+            // Using seq number as fallback ID if UID missing, but UID preferred
+            const displayId = id || item.seq; 
+            const idHeader = "Imap-Id: "+displayId + "\r\n";
             
             const parsed = await simpleParser(idHeader + (all.body || ""));
             
             emails.push({
-              id: `imap-${id}`,
+              id: `imap-${displayId}`,
               senderName: parsed.from?.text || 'Unknown',
               senderAddress: parsed.from?.value?.[0]?.address || '',
               subject: parsed.subject || '(No Subject)',
@@ -290,29 +284,35 @@ app.post('/api/mail/messages', async (req, res) => {
         tlsOptions: { rejectUnauthorized: false }
       });
 
+      // pop3.LIST() returns an array of messages with msgNumber and size
       const list = await pop3.LIST();
-      const total = list.length;
-      // Fetch last 50 messages
+      const total = list.length; // List is array in node-pop3
+      
+      // Fetch last 50 messages (POP3 usually lists oldest to newest, so end is newest)
       const start = Math.max(1, total - 49); 
       
       for (let i = total; i >= start; i--) {
-        const raw = await pop3.RETR(i);
-        const parsed = await simpleParser(raw);
-        
-        emails.push({
-          id: `pop3-${i}`,
-          senderName: parsed.from?.text || 'Unknown',
-          senderAddress: parsed.from?.value?.[0]?.address || '',
-          subject: parsed.subject || '(No Subject)',
-          body: parsed.text || '(No Content)',
-          receivedAt: parsed.date ? parsed.date.toISOString() : new Date().toISOString(),
-          isRead: true 
-        });
+        try {
+            const raw = await pop3.RETR(i);
+            const parsed = await simpleParser(raw);
+            
+            emails.push({
+              id: `pop3-${i}`,
+              senderName: parsed.from?.text || 'Unknown',
+              senderAddress: parsed.from?.value?.[0]?.address || '',
+              subject: parsed.subject || '(No Subject)',
+              body: parsed.text || '(No Content)',
+              receivedAt: parsed.date ? parsed.date.toISOString() : new Date().toISOString(),
+              isRead: true 
+            });
+        } catch (retrErr) {
+            console.warn(`POP3 RETR error for msg ${i}:`, retrErr.message);
+        }
       }
       await pop3.QUIT();
     }
 
-    // Final Sort: Newest First (Date Descending)
+    // Explicit Sort: Newest First (just to be safe after fetching)
     emails.sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt));
 
     res.json(emails);
