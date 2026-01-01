@@ -42,7 +42,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
           </div>
           <div>
             <p className="text-sm text-gray-500">진행 중인 작업</p>
-            <p className="text-2xl font-bold">{tasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length}</p>
+            <p className="text-2xl font-bold text-gray-800">{tasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length}</p>
           </div>
         </div>
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
@@ -51,7 +51,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
           </div>
           <div>
             <p className="text-sm text-gray-500">긴급 이슈</p>
-            <p className="text-2xl font-bold">{tasks.filter(t => t.priority === TaskPriority.CRITICAL && t.status !== TaskStatus.DONE).length}</p>
+            <p className="text-2xl font-bold text-gray-800">{tasks.filter(t => t.priority === TaskPriority.CRITICAL && t.status !== TaskStatus.DONE).length}</p>
           </div>
         </div>
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
@@ -60,7 +60,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
           </div>
           <div>
             <p className="text-sm text-gray-500">완료된 작업</p>
-            <p className="text-2xl font-bold">{tasks.filter(t => t.status === TaskStatus.DONE).length}</p>
+            <p className="text-2xl font-bold text-gray-800">{tasks.filter(t => t.status === TaskStatus.DONE).length}</p>
           </div>
         </div>
       </div>

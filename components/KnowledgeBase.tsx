@@ -46,8 +46,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
   const selectionRangeRef = useRef<Range | null>(null);
 
   const filteredItems = items.filter(item => {
-    const matchesSearch = item.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          item.tags.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()));
+    const term = searchTerm.toLowerCase();
+    const contentText = stripHtml(item.content).toLowerCase();
+    const matchesSearch = item.title.toLowerCase().includes(term) || 
+                          item.tags.some(t => t.toLowerCase().includes(term)) ||
+                          contentText.includes(term);
     const matchesCategory = selectedCategory === 'ALL' || item.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
