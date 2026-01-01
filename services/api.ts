@@ -43,6 +43,19 @@ export const api = {
          console.error(`[Signup Failed]`, e);
          throw e;
       }
+    },
+    updatePassword: async (userId: string | number, newPassword: string): Promise<void> => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}/password`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: newPassword }),
+        });
+        await handleResponse(response);
+      } catch (e) {
+        console.error("Failed to update password", e);
+        throw e;
+      }
     }
   },
   tasks: {

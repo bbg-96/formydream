@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings } from 'lucide-react';
 import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem, User } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TaskBoard } from './components/TaskBoard';
 import { GeminiChat } from './components/GeminiChat';
 import { Schedule } from './components/Schedule';
 import { KnowledgeBase } from './components/KnowledgeBase';
+import { MyPage } from './components/MyPage';
 import { Auth } from './components/Auth';
 import { api } from './services/api';
 
@@ -194,15 +195,24 @@ const App: React.FC = () => {
             {currentView === 'SCHEDULE' && 'Schedule'}
             {currentView === 'KNOWLEDGE' && 'Knowledge Base'}
             {currentView === 'AI_CHAT' && 'AI Support'}
+            {currentView === 'MY_PAGE' && 'My Page'}
           </h2>
           <div className="flex items-center gap-4">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm font-semibold text-gray-700">{user.name}</p>
-              <p className="text-xs text-gray-500">{user.role}</p>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center text-slate-600 font-bold overflow-hidden">
-               {/* Avatar Placeholder */}
-               {user.name.charAt(0).toUpperCase()}
+            <div 
+              className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 p-1.5 pr-4 rounded-full transition-colors group"
+              onClick={() => setCurrentView('MY_PAGE')}
+              title="마이페이지 / 설정"
+            >
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-semibold text-gray-700 group-hover:text-blue-600 transition-colors">{user.name}</p>
+                <p className="text-xs text-gray-500">{user.role}</p>
+              </div>
+              <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center text-slate-600 font-bold overflow-hidden relative">
+                {user.name.charAt(0).toUpperCase()}
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+                    <Settings size={16} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </div>
             </div>
           </div>
         </header>
@@ -214,6 +224,7 @@ const App: React.FC = () => {
           {currentView === 'AI_CHAT' && <GeminiChat tasks={tasks} />}
           {currentView === 'SCHEDULE' && <Schedule tasks={tasks} />}
           {currentView === 'KNOWLEDGE' && <KnowledgeBase items={knowledgeItems} setItems={setKnowledgeItems} />}
+          {currentView === 'MY_PAGE' && <MyPage user={user} />}
         </div>
       </main>
     </div>

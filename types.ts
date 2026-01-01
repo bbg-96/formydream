@@ -54,4 +54,4 @@ export interface AIBreakdownResponse {
   prioritySuggestion: string;
 }
 
-export type ViewMode = 'DASHBOARD' | 'TASKS' | 'SCHEDULE' | 'KNOWLEDGE' | 'AI_CHAT';
+export type ViewMode = 'DASHBOARD' | 'TASKS' | 'SCHEDULE' | 'KNOWLEDGE' | 'AI_CHAT' | 'MY_PAGE';
