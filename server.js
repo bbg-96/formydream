@@ -232,33 +232,47 @@ app.post('/api/mail/messages', async (req, res) => {
       await connection.openBox('INBOX');
       
       const searchCriteria = ['ALL'];
-      const fetchOptions = {
-        bodies: ['HEADER', 'TEXT'],
-        markSeen: false,
-        struct: true
-      };
       
-      // Fetch last 50 messages
-      const messages = await connection.search(searchCriteria, fetchOptions);
-      // Slice last 50
-      const recentMessages = messages.slice(-50);
-
-      for (const item of recentMessages) {
-        const all = item.parts.find(p => p.which === 'TEXT');
-        const id = item.attributes.uid;
-        const idHeader = "Imap-Id: "+id + "\r\n";
-        
-        const parsed = await simpleParser(idHeader + (all.body || ""));
-        
-        emails.push({
-          id: `imap-${id}`,
-          senderName: parsed.from?.text || 'Unknown',
-          senderAddress: parsed.from?.value?.[0]?.address || '',
-          subject: parsed.subject || '(No Subject)',
-          body: parsed.text || '(No Content)',
-          receivedAt: parsed.date ? parsed.date.toISOString() : new Date().toISOString(),
-          isRead: item.attributes.flags && item.attributes.flags.includes('\\Seen')
-        });
+      // OPTIMIZATION:
+      // 1. Fetch metadata (UIDs) only first. This is fast even for thousands of emails.
+      const allMessages = await connection.search(searchCriteria, { bodies: [] });
+      
+      // 2. Sort by UID ascending (Oldest -> Newest)
+      // This ensures we have the correct order before slicing
+      allMessages.sort((a, b) => a.attributes.uid - b.attributes.uid);
+      
+      // 3. Take last 50 (The newest 50)
+      const recentMessages = allMessages.slice(-50);
+      
+      // 4. Fetch the actual content only for these 50
+      const uids = recentMessages.map(m => m.attributes.uid);
+      
+      if (uids.length > 0) {
+          const fetchOptions = {
+            bodies: ['HEADER', 'TEXT'],
+            markSeen: false,
+            struct: true
+          };
+          // Search/Fetch using the specific UID list
+          const messages = await connection.search([['UID', ...uids]], fetchOptions);
+          
+          for (const item of messages) {
+            const all = item.parts.find(p => p.which === 'TEXT');
+            const id = item.attributes.uid;
+            const idHeader = "Imap-Id: "+id + "\r\n";
+            
+            const parsed = await simpleParser(idHeader + (all.body || ""));
+            
+            emails.push({
+              id: `imap-${id}`,
+              senderName: parsed.from?.text || 'Unknown',
+              senderAddress: parsed.from?.value?.[0]?.address || '',
+              subject: parsed.subject || '(No Subject)',
+              body: parsed.text || '(No Content)',
+              receivedAt: parsed.date ? parsed.date.toISOString() : new Date().toISOString(),
+              isRead: item.attributes.flags && item.attributes.flags.includes('\\Seen')
+            });
+          }
       }
       await connection.end();
 
@@ -295,7 +309,7 @@ app.post('/api/mail/messages', async (req, res) => {
       await pop3.QUIT();
     }
 
-    // Explicit Sort: Newest First
+    // Final Sort: Newest First (Date Descending)
     emails.sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt));
 
     res.json(emails);
