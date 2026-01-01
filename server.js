@@ -95,7 +95,7 @@ app.post('/api/tasks', async (req, res) => {
             `INSERT INTO tasks (id, user_id, title, description, status, priority, due_date, tags, sub_tasks, created_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              ON CONFLICT (id) DO UPDATE SET
-               title=$3, description=$4, status=$5, priority=$6, due_date=$7, tags=$8, sub_tasks=$9`,
+               title=$3, description=$4, status=$5, priority=$6, due_date=$7, tags=$8, sub_tasks=$9, created_at=$10`,
             [id, userId, title, description, status, priority, dueDate, tags, JSON.stringify(subTasks), createdAt]
         );
         res.json({ success: true });
@@ -143,7 +143,7 @@ app.post('/api/knowledge', async (req, res) => {
             `INSERT INTO knowledge (id, user_id, title, content, category, tags, is_draft, created_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              ON CONFLICT (id) DO UPDATE SET
-               title=$3, content=$4, category=$5, tags=$6, is_draft=$7`,
+               title=$3, content=$4, category=$5, tags=$6, is_draft=$7, created_at=$8`,
             [id, userId, title, content, category, tags, isDraft, createdAt]
         );
         res.json({ success: true });
@@ -166,6 +166,8 @@ app.delete('/api/knowledge/:id', async (req, res) => {
 app.put('/api/knowledge/:id', async (req, res) => {
     const { id } = req.params;
     const { userId, title, content, category, tags, isDraft } = req.body;
+    // Note: This endpoint might need createdAt if we want direct PUT updates to change time, 
+    // but the frontend primarily uses POST (upsert) for saving.
     try {
         await pool.query(
              `UPDATE knowledge SET title=$1, content=$2, category=$3, tags=$4, is_draft=$5 WHERE id=$6`,
@@ -206,11 +208,12 @@ app.post('/api/memos', async (req, res) => {
     const { id, userId, content, color, x, y, width, height, opacity, createdAt } = req.body;
     try {
         // [수정] opacity 컬럼 추가 저장/업데이트 (DB에 컬럼이 있다고 가정)
+        // created_at is updated on conflict to reflect modification time
         await pool.query(
             `INSERT INTO memos (id, user_id, content, color, x, y, width, height, opacity, created_at)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              ON CONFLICT (id) DO UPDATE SET
-               content=$3, color=$4, x=$5, y=$6, width=$7, height=$8, opacity=$9`,
+               content=$3, color=$4, x=$5, y=$6, width=$7, height=$8, opacity=$9, created_at=$10`,
             [id, userId, content, color, x || 0, y || 0, width || 280, height || 280, opacity || 1.0, createdAt]
         );
         res.json({ success: true });

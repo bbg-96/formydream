@@ -15,6 +15,22 @@ const COLORS = {
   PURPLE: 'bg-purple-200 border-purple-300',
 };
 
+const formatDateTime = (isoString: string) => {
+    try {
+        const date = new Date(isoString);
+        return date.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+    } catch (e) {
+        return isoString;
+    }
+};
+
 // [Optimized] Extracted MemoCard to prevent re-creation on every parent render
 interface MemoCardProps {
     memo: Memo;
@@ -323,7 +339,12 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
     const currentMemo = memos.find(m => m.id === id);
     if (!currentMemo) return;
 
-    const updatedMemo = { ...currentMemo, ...updates };
+    // Update timestamp on any modification
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const localNow = new Date(now.getTime() - offset).toISOString().slice(0, -1);
+
+    const updatedMemo = { ...currentMemo, ...updates, createdAt: localNow };
     setMemos(prev => prev.map(m => m.id === id ? updatedMemo : m));
 
     try {
@@ -487,8 +508,9 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
                           <button
                              key={c}
                              onClick={() => setFilterColor(c)}
-                             className={`w-5 h-5 rounded-full border border-gray-300 shrink-0 ${COLORS[c as keyof typeof COLORS].split(' ')[0]} ${filterColor === c ? 'ring-2 ring-offset-1 ring-blue-500' : ''}`}
+                             className={`w-5 h-5 rounded-full border border-gray-300 shrink-0 ${COLORS[c as keyof typeof COLORS].split(' ')[0]}`}
                              title={c}
+                             style={filterColor === c ? { transform: 'scale(1.2)', borderColor: '#3b82f6' } : {}}
                           />
                       ))}
                   </div>
@@ -529,7 +551,7 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
                                   </p>
                                   <div className="flex justify-between items-end mt-2">
                                       <span className="text-[10px] text-gray-400">
-                                          {new Date(memo.createdAt).toLocaleDateString()}
+                                          {formatDateTime(memo.createdAt)}
                                       </span>
                                       <span className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] flex items-center gap-1">
                                           <MapPin size={10} /> 이동

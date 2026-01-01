@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Task, TaskStatus, TaskPriority, SubTask } from '../types';
-import { Plus, Trash2, CheckSquare, Sparkles, Loader2, ChevronDown, ChevronUp, Calendar, Edit } from 'lucide-react';
+import { Plus, Trash2, CheckSquare, Sparkles, Loader2, ChevronDown, ChevronUp, Calendar, Edit, Clock } from 'lucide-react';
 import { generateTaskBreakdown } from '../services/geminiService';
 import { api } from '../services/api';
 
@@ -8,6 +8,23 @@ interface TaskBoardProps {
   tasks: Task[];
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
 }
+
+// Helper for display
+const formatDateTime = (isoString: string) => {
+    try {
+        const date = new Date(isoString);
+        return date.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+    } catch (e) {
+        return isoString;
+    }
+};
 
 export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -33,7 +50,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
   };
 
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
-    const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
+    // Status change also counts as modification, so update timestamp
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const localNow = new Date(now.getTime() - offset).toISOString().slice(0, -1);
+
+    const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, status: newStatus, createdAt: localNow } : t);
     setTasks(updatedTasks);
     
     // Sync with Backend
@@ -58,10 +80,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
       setNewTaskDueDate(task.dueDate || '');
       setNewTaskTags(task.tags.join(', '));
       
-      // Separate existing subtasks. For editing, we might want a better UI to add/remove/check subtasks
-      // But for now, let's keep it simple: We map existing ones to generatedSubtasks string array for display
-      // Note: This simplifies structure, losing 'completed' status if we just map to string.
-      // To preserve 'completed', we store them in a separate state `existingSubtasks`.
       setExistingSubtasks(task.subTasks);
       setGeneratedSubtasks(task.subTasks.map(st => st.title));
       
@@ -83,8 +101,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
         setNewTaskTags(newTags.join(', '));
       }
       
-      // Only set priority if it's currently default (MEDIUM) or user hasn't changed it manually? 
-      // For now, let AI overwrite if requested.
       const p = result.prioritySuggestion as keyof typeof TaskPriority;
       if (TaskPriority[p]) {
         setNewTaskPriority(TaskPriority[p]);
@@ -98,9 +114,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
     let subTasks: SubTask[];
 
     if (editingTaskId) {
-        // Merge Logic: 
-        // 1. Existing subtasks that are still in 'generatedSubtasks' string list (by title match) keep their ID and status.
-        // 2. New strings in 'generatedSubtasks' get new IDs.
         subTasks = generatedSubtasks.map((title, i) => {
             const existing = existingSubtasks.find(st => st.title === title);
             return existing ? existing : {
@@ -118,7 +131,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
         }));
     }
 
-    // [Fix] Generate Local Time String for DB storage
+    // [Fix] Generate Local Time String for DB storage (always update on save)
     const now = new Date();
     const offset = now.getTimezoneOffset() * 60000;
     const localNow = new Date(now.getTime() - offset).toISOString().slice(0, -1);
@@ -132,8 +145,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
       dueDate: newTaskDueDate || undefined,
       tags: newTaskTags.split(',').map(t => t.trim()).filter(Boolean),
       subTasks,
-      // Use Local Time instead of UTC for creation timestamp
-      createdAt: editingTaskId ? tasks.find(t => t.id === editingTaskId)?.createdAt || localNow : localNow,
+      createdAt: localNow, // Update timestamp on edit/create
     };
 
     setTasks(prev => {
@@ -387,12 +399,19 @@ const TaskCard: React.FC<{
       <h4 className="font-semibold text-gray-800 mb-1">{task.title}</h4>
       
       <div className="flex flex-col gap-2 mb-2">
-        {task.dueDate && (
-          <div className="flex items-center gap-1 text-[10px] text-gray-500">
-             <Calendar size={12} />
-             <span>{task.dueDate}</span>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+             {task.dueDate && (
+              <div className="flex items-center gap-1 text-[10px] text-gray-500">
+                 <Calendar size={12} />
+                 <span>{task.dueDate}</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1 text-[10px] text-gray-400">
+                 <Clock size={12} />
+                 <span title="마지막 수정">{formatDateTime(task.createdAt)}</span>
+            </div>
+        </div>
+
         {task.tags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {task.tags.map(tag => (

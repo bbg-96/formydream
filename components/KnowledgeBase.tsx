@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { Search, Plus, Tag, BookOpen, X, Hash, Trash2, Image as ImageIcon, ArrowLeft, Save, List, ListOrdered, Indent, Outdent, AlertCircle, FileText, Edit, Sparkles, Loader2, RotateCcw } from 'lucide-react';
+import { Search, Plus, Tag, BookOpen, X, Hash, Trash2, Image as ImageIcon, ArrowLeft, Save, List, ListOrdered, Indent, Outdent, AlertCircle, FileText, Edit, Sparkles, Loader2, RotateCcw, Clock } from 'lucide-react';
 import { KnowledgeItem } from '../types';
 import { api } from '../services/api';
 import { searchKnowledgeBaseWithAI } from '../services/geminiService';
@@ -28,6 +28,22 @@ const stripHtml = (html: string) => {
 const getUserId = () => {
     const userStr = localStorage.getItem('cloudops_user');
     return userStr ? JSON.parse(userStr).id : 'unknown';
+};
+
+const formatDateTime = (isoString: string) => {
+    try {
+        const date = new Date(isoString);
+        return date.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false
+        });
+    } catch (e) {
+        return isoString;
+    }
 };
 
 export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems }) => {
@@ -176,10 +192,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
     const finalTitle = newTitle.trim() || (isDraft ? '(제목 없음)' : '');
     if (!finalTitle && !isDraft) return;
 
-    // [Fix] Generate Local Date (YYYY-MM-DD) for DB storage
+    // [Fix] Generate Local Time (KST) for DB storage. 
+    // Always update timestamp on save/edit.
     const now = new Date();
     const offset = now.getTimezoneOffset() * 60000;
-    const localDate = new Date(now.getTime() - offset).toISOString().split('T')[0];
+    const localNow = new Date(now.getTime() - offset).toISOString().slice(0, -1);
 
     const newItem: KnowledgeItem = {
       id: editingId || `k-${Date.now()}`,
@@ -187,7 +204,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
       content: newContent,
       category: newCategory,
       tags: newTags.split(',').map(t => t.trim()).filter(Boolean),
-      createdAt: localDate, // Use Local Date
+      createdAt: localNow, // Updates timestamp
       isDraft: isDraft
     };
 
@@ -569,30 +586,26 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
           </div>
         </div>
 
-        {/* Tag Filters (Replaces Category Filters) */}
-        <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0 items-center">
-            <div className="flex items-center gap-1 text-gray-400 mr-1 shrink-0">
+        {/* Tag Filters (Listbox/Select) */}
+        <div className="relative min-w-[200px]">
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
                 <Hash size={16} />
-                <span className="text-xs font-medium">태그:</span>
             </div>
-          <button 
-            onClick={() => setSelectedTag(null)}
-            className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${selectedTag === null ? 'bg-slate-800 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
-          >
-            전체
-          </button>
-          {allTags.map(tag => (
-             <button 
-               key={tag}
-               onClick={() => setSelectedTag(tag)}
-               className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors ${selectedTag === tag ? 'bg-slate-800 text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
-             >
-               #{tag}
-             </button>
-          ))}
-          {allTags.length === 0 && (
-              <span className="text-xs text-gray-400 italic px-2">등록된 태그 없음</span>
-          )}
+            <select
+                value={selectedTag || ''}
+                onChange={(e) => setSelectedTag(e.target.value || null)}
+                className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm appearance-none bg-white focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+            >
+                <option value="">전체 태그</option>
+                {allTags.map(tag => (
+                    <option key={tag} value={tag}>#{tag}</option>
+                ))}
+            </select>
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+            </div>
         </div>
       </div>
 
@@ -625,7 +638,10 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded border ${getCategoryColor(item.category)}`}>
                 {item.category}
               </span>
-              <span className="text-xs text-gray-400">{item.createdAt}</span>
+              <span className="text-[10px] text-gray-400 flex items-center gap-1">
+                <Clock size={10} />
+                {formatDateTime(item.createdAt)}
+              </span>
             </div>
             
             <h3 className="text-lg font-bold text-gray-800 mb-2 line-clamp-2 pr-12">{item.title}</h3>
@@ -686,7 +702,9 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
                       {viewingItem.category}
                    </span>
                    <h2 className="text-2xl font-bold text-gray-800">{viewingItem.title}</h2>
-                   <p className="text-sm text-gray-400 mt-1">{viewingItem.createdAt}</p>
+                   <p className="text-sm text-gray-400 mt-1 flex items-center gap-1">
+                    <Clock size={12} /> {formatDateTime(viewingItem.createdAt)}
+                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button 
