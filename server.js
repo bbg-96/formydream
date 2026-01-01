@@ -18,13 +18,30 @@ const pool = new Pool({
   port: 5432,
 });
 
-// [DB Connection Test on Startup]
-pool.connect((err, client, release) => {
+// [DB Connection Test & Init]
+pool.connect(async (err, client, release) => {
   if (err) {
     console.error('Error acquiring client', err.stack);
     console.error('!!! DATABASE CONNECTION FAILED !!! - Check host, password, or network.');
   } else {
     console.log('>>> Database Connected Successfully to 10.200.0.159');
+    
+    // Auto-create memos table if not exists
+    try {
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS memos (
+                id VARCHAR(50) PRIMARY KEY,
+                user_id INTEGER,
+                content TEXT,
+                color VARCHAR(20),
+                created_at TIMESTAMP
+            )
+        `);
+        console.log('>>> Memos Table Ready');
+    } catch(tableErr) {
+        console.error('Failed to create memos table', tableErr);
+    }
+    
     release();
   }
 });
@@ -178,6 +195,51 @@ app.put('/api/knowledge/:id', async (req, res) => {
     }
 });
 
+// --- Memos ---
+app.get('/api/memos', async (req, res) => {
+    const { userId } = req.query;
+    try {
+        const result = await pool.query('SELECT * FROM memos WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
+        const formatted = result.rows.map(row => ({
+            id: row.id,
+            content: row.content,
+            color: row.color,
+            createdAt: row.created_at
+        }));
+        res.json(formatted);
+    } catch (err) {
+        console.error('Get Memos Error:', err);
+        res.status(500).json([]);
+    }
+});
+
+app.post('/api/memos', async (req, res) => {
+    const { id, userId, content, color, createdAt } = req.body;
+    try {
+        await pool.query(
+            `INSERT INTO memos (id, user_id, content, color, created_at)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (id) DO UPDATE SET
+               content=$3, color=$4`,
+            [id, userId, content, color, createdAt]
+        );
+        res.json({ success: true });
+    } catch(err) {
+        console.error('Save Memo Error:', err);
+        res.status(500).json({error: err.message});
+    }
+});
+
+app.delete('/api/memos/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM memos WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch(err) {
+        console.error('Delete Memo Error:', err);
+        res.status(500).json({error: err.message});
+    }
+});
+
 // --- User Settings ---
 app.put('/api/users/:id/password', async (req, res) => {
   const { id } = req.params;
@@ -192,7 +254,5 @@ app.put('/api/users/:id/password', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-// Mail routes are removed from here. Run mailServer.js separately if needed.
 
 app.listen(3001, '0.0.0.0', () => console.log('Server running on 3001'));

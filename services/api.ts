@@ -1,4 +1,4 @@
-import { User, Task, KnowledgeItem, Email } from '../types';
+import { User, Task, KnowledgeItem, Email, Memo } from '../types';
 
 // =================================================================
 // [설정 확인] 사용자의 VM IP 주소
@@ -131,6 +131,36 @@ export const api = {
            console.error("Failed to delete knowledge", e);
         }
       }
+  },
+  memos: {
+    getAll: async (userId: string | number): Promise<Memo[]> => {
+      try {
+        const uidStr = String(userId);
+        const response = await fetch(`${API_BASE_URL}/memos?userId=${uidStr}`);
+        return handleResponse(response);
+      } catch (error) {
+        console.warn("API Error (Memos):", error);
+        return [];
+      }
+    },
+    save: async (userId: string | number, memo: Memo): Promise<void> => {
+      try {
+        await fetch(`${API_BASE_URL}/memos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...memo, userId }),
+        });
+      } catch (e) {
+        console.error("Failed to save memo", e);
+      }
+    },
+    delete: async (memoId: string): Promise<void> => {
+      try {
+        await fetch(`${API_BASE_URL}/memos/${memoId}`, { method: 'DELETE' });
+      } catch (e) {
+        console.error("Failed to delete memo", e);
+      }
+    }
   },
   mail: {
     connect: async (userId: string | number, config: any): Promise<boolean> => {

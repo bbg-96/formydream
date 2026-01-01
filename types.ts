@@ -48,6 +48,15 @@ export interface KnowledgeItem {
   isDraft?: boolean;
 }
 
+export interface Memo {
+  id: string;
+  content: string;
+  color: 'YELLOW' | 'BLUE' | 'GREEN' | 'PINK' | 'PURPLE';
+  createdAt: string;
+  x?: number; // Optional: for future drag & drop
+  y?: number;
+}
+
 export interface Email {
   id: string;
   senderName: string;
@@ -83,4 +92,4 @@ export interface AIBreakdownResponse {
   prioritySuggestion: string;
 }
 
-export type ViewMode = 'DASHBOARD' | 'TASKS' | 'SCHEDULE' | 'KNOWLEDGE' | 'AI_CHAT' | 'MY_PAGE' | 'MAIL';
+export type ViewMode = 'DASHBOARD' | 'TASKS' | 'SCHEDULE' | 'KNOWLEDGE' | 'AI_CHAT' | 'MY_PAGE' | 'MAIL' | 'MEMO';

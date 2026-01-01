@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote } from 'lucide-react';
 import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem, User, MailAccount } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TaskBoard } from './components/TaskBoard';
@@ -7,6 +7,7 @@ import { GeminiChat } from './components/GeminiChat';
 import { Schedule } from './components/Schedule';
 import { KnowledgeBase } from './components/KnowledgeBase';
 import { MyPage } from './components/MyPage';
+import { MemoBoard } from './components/MemoBoard';
 // import { MailClient } from './components/MailClient'; // Hidden feature
 import { Auth } from './components/Auth';
 import { api } from './services/api';
@@ -196,6 +197,7 @@ const App: React.FC = () => {
           <SidebarItem view="DASHBOARD" icon={<LayoutDashboard size={20} />} label="대시보드" />
           <SidebarItem view="TASKS" icon={<ListTodo size={20} />} label="업무 관리" />
           <SidebarItem view="SCHEDULE" icon={<CalendarIcon size={20} />} label="일정" />
+          <SidebarItem view="MEMO" icon={<StickyNote size={20} />} label="퀵 메모" />
           {/* <SidebarItem view="MAIL" icon={<Mail size={20} />} label="메일함" /> */}
           <SidebarItem view="KNOWLEDGE" icon={<BookOpen size={20} />} label="지식 저장소" />
           <SidebarItem view="AI_CHAT" icon={<Bot size={20} />} label="AI 어시스턴트" />
@@ -221,6 +223,7 @@ const App: React.FC = () => {
             {currentView === 'TASKS' && 'Task Board'}
             {currentView === 'SCHEDULE' && 'Schedule'}
             {currentView === 'MAIL' && 'Mail Inbox'}
+            {currentView === 'MEMO' && 'Quick Sticky Notes'}
             {currentView === 'KNOWLEDGE' && 'Knowledge Base'}
             {currentView === 'AI_CHAT' && 'AI Support'}
             {currentView === 'MY_PAGE' && 'My Page'}
@@ -251,6 +254,7 @@ const App: React.FC = () => {
           {currentView === 'TASKS' && <TaskBoard tasks={tasks} setTasks={setTasks} />}
           {currentView === 'AI_CHAT' && <GeminiChat tasks={tasks} />}
           {currentView === 'SCHEDULE' && <Schedule tasks={tasks} />}
+          {currentView === 'MEMO' && <MemoBoard userId={user.id} />}
           {/* {currentView === 'MAIL' && (
             <MailClient 
               user={user} 
