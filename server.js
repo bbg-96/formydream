@@ -26,7 +26,7 @@ pool.connect(async (err, client, release) => {
   } else {
     console.log('>>> Database Connected Successfully to 10.200.0.159');
     
-    // Auto-create memos table if not exists
+    // Auto-create memos table if not exists (Updated with x, y)
     try {
         await client.query(`
             CREATE TABLE IF NOT EXISTS memos (
@@ -34,6 +34,8 @@ pool.connect(async (err, client, release) => {
                 user_id INTEGER,
                 content TEXT,
                 color VARCHAR(20),
+                x INTEGER DEFAULT 0,
+                y INTEGER DEFAULT 0,
                 created_at TIMESTAMP
             )
         `);
@@ -204,6 +206,8 @@ app.get('/api/memos', async (req, res) => {
             id: row.id,
             content: row.content,
             color: row.color,
+            x: row.x || 0,
+            y: row.y || 0,
             createdAt: row.created_at
         }));
         res.json(formatted);
@@ -214,14 +218,14 @@ app.get('/api/memos', async (req, res) => {
 });
 
 app.post('/api/memos', async (req, res) => {
-    const { id, userId, content, color, createdAt } = req.body;
+    const { id, userId, content, color, x, y, createdAt } = req.body;
     try {
         await pool.query(
-            `INSERT INTO memos (id, user_id, content, color, created_at)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO memos (id, user_id, content, color, x, y, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              ON CONFLICT (id) DO UPDATE SET
-               content=$3, color=$4`,
-            [id, userId, content, color, createdAt]
+               content=$3, color=$4, x=$5, y=$6`,
+            [id, userId, content, color, x || 0, y || 0, createdAt]
         );
         res.json({ success: true });
     } catch(err) {

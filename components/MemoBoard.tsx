@@ -35,6 +35,8 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
       id: `memo-${Date.now()}`,
       content: '',
       color: 'YELLOW',
+      x: 0,
+      y: 0,
       createdAt: new Date().toISOString()
     };
     // Add locally immediately
@@ -51,18 +53,20 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
   };
 
   const handleUpdate = async (id: string, updates: Partial<Memo>) => {
-    setMemos(prev => prev.map(m => {
-        if (m.id === id) {
-            return { ...m, ...updates };
-        }
-        return m;
-    }));
+    const currentMemo = memos.find(m => m.id === id);
+    if (!currentMemo) return;
 
-    // Find the updated memo from state (or construct it) to save
-    const current = memos.find(m => m.id === id);
-    if (current) {
-        const updated = { ...current, ...updates };
-        await api.memos.save(userId, updated);
+    const updatedMemo = { ...currentMemo, ...updates };
+
+    // Optimistic Update
+    setMemos(prev => prev.map(m => m.id === id ? updatedMemo : m));
+
+    // Save to DB
+    try {
+        await api.memos.save(userId, updatedMemo);
+    } catch (e) {
+        console.error("Failed to save memo", e);
+        // Optionally revert state here if strict consistency is needed
     }
   };
 
@@ -113,6 +117,7 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
             
             <div className="absolute bottom-3 right-3 text-[10px] text-gray-500 flex items-center gap-1">
                 {isFocused && <span className="text-blue-600 animate-pulse">작성 중...</span>}
+                {!isFocused && localContent === memo.content && <span className="text-green-600 flex items-center gap-1"><Check size={10}/> Saved</span>}
             </div>
         </div>
       );
