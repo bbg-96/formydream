@@ -1,10 +1,10 @@
 import { User, Task, KnowledgeItem, Email, Memo } from '../types';
 
 // =================================================================
-// [배포 설정] Nginx Reverse Proxy를 사용하므로 상대 경로로 변경
+// [중요] Nginx Reverse Proxy를 사용하기 위해 상대 경로('/api')로 설정합니다.
+// 절대 경로(http://10.200.0.160:3001)를 사용하면 외부망에서 접속 시 오류가 발생합니다.
 // =================================================================
 const API_BASE_URL = '/api';
-// 메일 서버도 동일하게 프록시 처리 (Nginx 설정에서 분기)
 const MAIL_API_BASE_URL = '/api/mail';
 
 // Helper to handle response
