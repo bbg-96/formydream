@@ -12,12 +12,25 @@ import { MemoBoard } from './components/MemoBoard';
 import { Auth } from './components/Auth';
 import { api } from './services/api';
 
-// Helper to get today's date in YYYY-MM-DD format
-const getToday = () => new Date().toISOString().split('T')[0];
+// Helper to get local ISO string (KST)
+const getLocalISOString = () => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offset).toISOString().slice(0, -1); // Remove 'Z'
+};
+
+// Helper to get today's date in YYYY-MM-DD format (Local Time)
+const getToday = () => {
+  const now = new Date();
+  const offset = now.getTimezoneOffset() * 60000;
+  return new Date(now.getTime() - offset).toISOString().split('T')[0];
+};
+
 const getFutureDate = (days: number) => {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
+  const offset = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - offset).toISOString().split('T')[0];
 };
 
 // Fallback Mock Data for Tasks (Used if API connection fails)
@@ -31,7 +44,7 @@ const FALLBACK_TASKS: Task[] = [
     dueDate: getFutureDate(2),
     tags: ['EKS', 'Kubernetes', 'Maintenance'],
     subTasks: [{id: 's1', title: '릴리즈 노트 확인', completed: true}, {id: 's2', title: '백업 수행', completed: false}],
-    createdAt: new Date().toISOString()
+    createdAt: getLocalISOString()
   },
   {
     id: 't2',
@@ -42,7 +55,7 @@ const FALLBACK_TASKS: Task[] = [
     dueDate: getFutureDate(5),
     tags: ['AWS', 'RDS', 'Database'],
     subTasks: [],
-    createdAt: new Date().toISOString()
+    createdAt: getLocalISOString()
   },
   {
     id: 't3',
@@ -53,7 +66,7 @@ const FALLBACK_TASKS: Task[] = [
     dueDate: getToday(),
     tags: ['Security', 'Compliance'],
     subTasks: [],
-    createdAt: new Date().toISOString()
+    createdAt: getLocalISOString()
   },
     {
     id: 't4',
@@ -64,7 +77,7 @@ const FALLBACK_TASKS: Task[] = [
     dueDate: getFutureDate(-1),
     tags: ['Cost', 'FinOps'],
     subTasks: [],
-    createdAt: new Date().toISOString()
+    createdAt: getLocalISOString()
   },
 ];
 

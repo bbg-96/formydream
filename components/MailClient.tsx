@@ -153,6 +153,11 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks, mailAcco
   const handleCreateTask = async () => {
     if (!newTaskTitle) return;
 
+    // [Fix] Use Local Time (KST) for DB storage
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const localNow = new Date(now.getTime() - offset).toISOString().slice(0, -1);
+
     const newTask: Task = {
       id: `task-${Date.now()}`,
       title: newTaskTitle,
@@ -162,7 +167,7 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks, mailAcco
       dueDate: newTaskDueDate,
       tags: ['Email-Import'],
       subTasks: [],
-      createdAt: new Date().toISOString(),
+      createdAt: localNow,
     };
 
     try {

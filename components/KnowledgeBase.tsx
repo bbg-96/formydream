@@ -126,13 +126,18 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
     const finalTitle = newTitle.trim() || (isDraft ? '(제목 없음)' : '');
     if (!finalTitle && !isDraft) return;
 
+    // [Fix] Generate Local Date (YYYY-MM-DD) for DB storage
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const localDate = new Date(now.getTime() - offset).toISOString().split('T')[0];
+
     const newItem: KnowledgeItem = {
       id: editingId || `k-${Date.now()}`,
       title: finalTitle,
       content: newContent,
       category: newCategory,
       tags: newTags.split(',').map(t => t.trim()).filter(Boolean),
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: localDate, // Use Local Date
       isDraft: isDraft
     };
 

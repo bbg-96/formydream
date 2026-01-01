@@ -290,6 +290,13 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
     }
 
     const offset = Math.floor(Math.random() * 40);
+
+    // [Fix] Use Local Time (KST) instead of UTC for DB storage
+    const now = new Date();
+    const timezoneOffset = now.getTimezoneOffset() * 60000;
+    const localDate = new Date(now.getTime() - timezoneOffset);
+    const localCreatedAt = localDate.toISOString().slice(0, -1); // Remove 'Z' to store as local ISO string
+
     const newMemo: Memo = {
       id: `memo-${Date.now()}`,
       content: '',
@@ -299,7 +306,7 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
       width: 280,
       height: 280,
       opacity: 1,
-      createdAt: new Date().toISOString()
+      createdAt: localCreatedAt
     };
     setMemos(prev => [...prev, newMemo]); 
     await api.memos.save(userId, newMemo);

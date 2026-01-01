@@ -118,6 +118,11 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
         }));
     }
 
+    // [Fix] Generate Local Time String for DB storage
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const localNow = new Date(now.getTime() - offset).toISOString().slice(0, -1);
+
     const task: Task = {
       id: editingTaskId || `task-${Date.now()}`,
       title: newTaskTitle,
@@ -127,7 +132,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
       dueDate: newTaskDueDate || undefined,
       tags: newTaskTags.split(',').map(t => t.trim()).filter(Boolean),
       subTasks,
-      createdAt: editingTaskId ? tasks.find(t => t.id === editingTaskId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
+      // Use Local Time instead of UTC for creation timestamp
+      createdAt: editingTaskId ? tasks.find(t => t.id === editingTaskId)?.createdAt || localNow : localNow,
     };
 
     setTasks(prev => {
