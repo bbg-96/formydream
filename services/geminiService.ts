@@ -1,16 +1,7 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { AIBreakdownResponse } from "../types";
 
-// Safely access env variable to prevent 'process is not defined' error in browser
-const getApiKey = () => {
-  try {
-    return process.env.API_KEY || '';
-  } catch (e) {
-    return '';
-  }
-};
-
-const apiKey = getApiKey();
+const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
 
 export const generateTaskBreakdown = async (taskTitle: string, taskDescription: string): Promise<AIBreakdownResponse | null> => {
