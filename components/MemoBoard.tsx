@@ -15,6 +15,206 @@ const COLORS = {
   PURPLE: 'bg-purple-200 border-purple-300',
 };
 
+// [Optimized] Extracted MemoCard to prevent re-creation on every parent render
+interface MemoCardProps {
+    memo: Memo;
+    onUpdate: (id: string, updates: Partial<Memo>) => void;
+    onDelete: (id: string) => void;
+    onBringToFront: (id: string) => void;
+}
+
+const MemoCard: React.FC<MemoCardProps> = ({ memo, onUpdate, onDelete, onBringToFront }) => {
+    const [localContent, setLocalContent] = useState(memo.content);
+    const [isFocused, setIsFocused] = useState(false);
+    const [isResizing, setIsResizing] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
+    const memoRef = useRef<HTMLDivElement>(null);
+
+    // Sync props to DOM styles ensuring React doesn't overwrite manual drag/resize updates.
+    useLayoutEffect(() => {
+        if (memoRef.current) {
+            // Only apply props-based styles if we are NOT actively interacting.
+            if (!isDragging && !isResizing) {
+                memoRef.current.style.left = `${memo.x || 0}px`;
+                memoRef.current.style.top = `${memo.y || 0}px`;
+                memoRef.current.style.width = `${memo.width || 280}px`;
+                memoRef.current.style.height = `${memo.height || 280}px`;
+            }
+        }
+    }, [memo.x, memo.y, memo.width, memo.height, isDragging, isResizing]);
+
+    useEffect(() => {
+        setLocalContent(memo.content);
+    }, [memo.content]);
+
+    const handleBlur = () => {
+        setIsFocused(false);
+        if (localContent !== memo.content) {
+            onUpdate(memo.id, { content: localContent });
+        }
+    };
+
+    // --- Drag Logic (Position) ---
+    const handleDragStart = (e: React.MouseEvent) => {
+        const target = e.target as HTMLElement;
+        if (target.tagName === 'TEXTAREA') return; 
+        if (target.closest('button')) return;
+        if (target.closest('.resize-handle')) return;
+
+        e.preventDefault();
+        // Don't call onBringToFront here to avoid re-render loop start. 
+        // We use z-index in style to handle visual layering during drag.
+        setIsDragging(true);
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        
+        const rect = memoRef.current?.getBoundingClientRect();
+        const parentRect = memoRef.current?.parentElement?.getBoundingClientRect();
+        
+        const initialX = rect && parentRect ? rect.left - parentRect.left + (memoRef.current?.parentElement?.scrollLeft || 0) : (memo.x || 0);
+        const initialY = rect && parentRect ? rect.top - parentRect.top + (memoRef.current?.parentElement?.scrollTop || 0) : (memo.y || 0);
+
+        const handleMouseMove = (me: MouseEvent) => {
+            const dx = me.clientX - startX;
+            const dy = me.clientY - startY;
+            
+            if (memoRef.current) {
+                memoRef.current.style.left = `${initialX + dx}px`;
+                memoRef.current.style.top = `${initialY + dy}px`;
+            }
+        };
+
+        const handleMouseUp = (ue: MouseEvent) => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+            
+            const dx = ue.clientX - startX;
+            const dy = ue.clientY - startY;
+            
+            if (dx !== 0 || dy !== 0) {
+                onUpdate(memo.id, { x: initialX + dx, y: initialY + dy });
+            }
+            
+            // Reorder only after drag finishes
+            onBringToFront(memo.id);
+            setIsDragging(false);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+    };
+
+    // --- Resize Logic (Size) ---
+    const handleResizeStart = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation(); 
+      setIsResizing(true);
+      // z-index will handle layering during resize
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startWidth = memoRef.current?.offsetWidth || memo.width || 280;
+      const startHeight = memoRef.current?.offsetHeight || memo.height || 280;
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+          const newWidth = Math.max(200, startWidth + (moveEvent.clientX - startX));
+          const newHeight = Math.max(200, startHeight + (moveEvent.clientY - startY));
+          
+          if (memoRef.current) {
+              memoRef.current.style.width = `${newWidth}px`;
+              memoRef.current.style.height = `${newHeight}px`;
+          }
+      };
+
+      const handleMouseUp = (upEvent: MouseEvent) => {
+          document.removeEventListener('mousemove', handleMouseMove);
+          document.removeEventListener('mouseup', handleMouseUp);
+          
+          const newWidth = Math.max(200, startWidth + (upEvent.clientX - startX));
+          const newHeight = Math.max(200, startHeight + (upEvent.clientY - startY));
+
+          onUpdate(memo.id, { width: newWidth, height: newHeight });
+          onBringToFront(memo.id);
+          setIsResizing(false);
+      };
+
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    };
+
+    return (
+      <div 
+          ref={memoRef}
+          onMouseDown={handleDragStart}
+          style={{ 
+              position: 'absolute',
+              // Visual optimization: High z-index during interaction
+              zIndex: isDragging || isResizing ? 9999 : 'auto' 
+          }}
+          className={`
+              p-5 rounded-lg shadow-md border ${COLORS[memo.color as keyof typeof COLORS]} 
+              flex flex-col transition-shadow hover:shadow-xl group
+              ${isDragging ? 'cursor-grabbing shadow-2xl opacity-90' : 'cursor-grab'}
+              ${isResizing ? 'cursor-se-resize' : ''}
+          `}
+      >
+          {/* Color Picker & Delete */}
+          <div className="flex justify-between items-start mb-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2 left-4 z-10">
+              <div 
+                  className="flex gap-1 bg-white/50 p-1 rounded-full backdrop-blur-sm"
+                  onMouseDown={(e) => e.stopPropagation()} 
+              >
+                  {Object.keys(COLORS).map((c) => (
+                      <button
+                          key={c}
+                          onClick={() => onUpdate(memo.id, { color: c as any })}
+                          className={`w-3 h-3 rounded-full border border-gray-300 hover:scale-125 transition-transform ${COLORS[c as keyof typeof COLORS].split(' ')[0]}`}
+                      />
+                  ))}
+              </div>
+              <button 
+                  onClick={() => onDelete(memo.id)}
+                  className="text-gray-500 hover:text-red-600 bg-white/50 p-1 rounded-full"
+                  onMouseDown={(e) => e.stopPropagation()}
+              >
+                  <Trash2 size={14} />
+              </button>
+          </div>
+
+          <textarea
+              value={localContent}
+              onChange={(e) => setLocalContent(e.target.value)}
+              onFocus={() => {
+                  setIsFocused(true);
+                  onBringToFront(memo.id);
+              }}
+              onBlur={handleBlur}
+              className={`
+                  w-full h-full bg-transparent resize-none outline-none text-gray-800 
+                  placeholder:text-gray-500/50 mt-4 leading-relaxed font-medium cursor-text
+                  ${isDragging || isResizing ? 'pointer-events-none' : ''}
+              `}
+              placeholder="내용을 입력하세요..."
+              onMouseDown={(e) => e.stopPropagation()}
+          />
+          
+          <div className="absolute bottom-3 left-4 text-[10px] text-gray-500 flex items-center gap-1 pointer-events-none select-none">
+              {isFocused && <span className="text-blue-600 animate-pulse">작성 중...</span>}
+              {!isFocused && localContent === memo.content && <span className="text-green-600 flex items-center gap-1"><Check size={10}/> Saved</span>}
+          </div>
+
+          <div 
+              className="resize-handle absolute bottom-0 right-0 w-8 h-8 flex items-end justify-end p-1.5 cursor-se-resize text-gray-400 hover:text-gray-600 z-20 hover:bg-black/5 rounded-tl-xl transition-colors"
+              onMouseDown={handleResizeStart}
+              title="크기 조절"
+          >
+              <GripHorizontal size={16} className="-rotate-45" />
+          </div>
+      </div>
+    );
+};
+
 export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
   const [memos, setMemos] = useState<Memo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,9 +231,7 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
   };
 
   const handleAddMemo = async () => {
-    // Random position offset to prevent stacking perfectly
     const offset = Math.floor(Math.random() * 40);
-    
     const newMemo: Memo = {
       id: `memo-${Date.now()}`,
       content: '',
@@ -44,9 +242,7 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
       height: 280,
       createdAt: new Date().toISOString()
     };
-    // Add locally immediately
-    setMemos(prev => [...prev, newMemo]); // Newest at the end (top z-index visually)
-    // Sync
+    setMemos(prev => [...prev, newMemo]); 
     await api.memos.save(userId, newMemo);
   };
 
@@ -62,11 +258,8 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
     if (!currentMemo) return;
 
     const updatedMemo = { ...currentMemo, ...updates };
-
-    // Optimistic Update
     setMemos(prev => prev.map(m => m.id === id ? updatedMemo : m));
 
-    // Save to DB
     try {
         await api.memos.save(userId, updatedMemo);
     } catch (e) {
@@ -74,7 +267,6 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
     }
   };
 
-  // Move memo to the end of the array to render it on top
   const bringToFront = (id: string) => {
       setMemos(prev => {
           const index = prev.findIndex(m => m.id === id);
@@ -84,201 +276,6 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
           newMemos.push(moved);
           return newMemos;
       });
-  };
-
-  const MemoCard: React.FC<{ memo: Memo }> = ({ memo }) => {
-      const [localContent, setLocalContent] = useState(memo.content);
-      const [isFocused, setIsFocused] = useState(false);
-      const [isResizing, setIsResizing] = useState(false);
-      const [isDragging, setIsDragging] = useState(false);
-      const memoRef = useRef<HTMLDivElement>(null);
-
-      // [CRITICAL FIX]
-      // Sync props to DOM styles ensuring React doesn't overwrite manual drag/resize updates.
-      // We use useLayoutEffect to prevent FOUC (Flash of Unstyled Content) and ensure sync before paint.
-      useLayoutEffect(() => {
-          if (memoRef.current) {
-              // Only apply props-based styles if we are NOT actively interacting.
-              // This allows the drag/resize handlers to manipulate the DOM directly without React interference.
-              if (!isDragging && !isResizing) {
-                  memoRef.current.style.left = `${memo.x || 0}px`;
-                  memoRef.current.style.top = `${memo.y || 0}px`;
-                  memoRef.current.style.width = `${memo.width || 280}px`;
-                  memoRef.current.style.height = `${memo.height || 280}px`;
-              }
-          }
-      }, [memo.x, memo.y, memo.width, memo.height, isDragging, isResizing]);
-
-      useEffect(() => {
-          setLocalContent(memo.content);
-      }, [memo.content]);
-
-      const handleBlur = () => {
-          setIsFocused(false);
-          if (localContent !== memo.content) {
-              handleUpdate(memo.id, { content: localContent });
-          }
-      };
-
-      // --- Drag Logic (Position) ---
-      const handleDragStart = (e: React.MouseEvent) => {
-          // Prevent drag if interacting with specific controls
-          const target = e.target as HTMLElement;
-          if (target.tagName === 'TEXTAREA') return; 
-          if (target.closest('button')) return;
-          if (target.closest('.resize-handle')) return;
-
-          e.preventDefault();
-          bringToFront(memo.id);
-          setIsDragging(true);
-
-          const startX = e.clientX;
-          const startY = e.clientY;
-          // Use current DOM position as source of truth for smooth start
-          const rect = memoRef.current?.getBoundingClientRect();
-          const parentRect = memoRef.current?.parentElement?.getBoundingClientRect();
-          
-          // Calculate relative position inside the container
-          const initialX = rect && parentRect ? rect.left - parentRect.left + (memoRef.current?.parentElement?.scrollLeft || 0) : (memo.x || 0);
-          const initialY = rect && parentRect ? rect.top - parentRect.top + (memoRef.current?.parentElement?.scrollTop || 0) : (memo.y || 0);
-
-          const handleMouseMove = (me: MouseEvent) => {
-              const dx = me.clientX - startX;
-              const dy = me.clientY - startY;
-              
-              if (memoRef.current) {
-                  memoRef.current.style.left = `${initialX + dx}px`;
-                  memoRef.current.style.top = `${initialY + dy}px`;
-              }
-          };
-
-          const handleMouseUp = (ue: MouseEvent) => {
-              document.removeEventListener('mousemove', handleMouseMove);
-              document.removeEventListener('mouseup', handleMouseUp);
-              
-              const dx = ue.clientX - startX;
-              const dy = ue.clientY - startY;
-              
-              // Update state and DB
-              if (dx !== 0 || dy !== 0) {
-                  handleUpdate(memo.id, { x: initialX + dx, y: initialY + dy });
-              }
-              // Set dragging to false AFTER update to ensure effect syncs with new position
-              setIsDragging(false);
-          };
-
-          document.addEventListener('mousemove', handleMouseMove);
-          document.addEventListener('mouseup', handleMouseUp);
-      };
-
-      // --- Resize Logic (Size) ---
-      const handleResizeStart = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation(); // Stop bubbling to drag handler
-        setIsResizing(true);
-        bringToFront(memo.id);
-
-        const startX = e.clientX;
-        const startY = e.clientY;
-        const startWidth = memoRef.current?.offsetWidth || memo.width || 280;
-        const startHeight = memoRef.current?.offsetHeight || memo.height || 280;
-
-        const handleMouseMove = (moveEvent: MouseEvent) => {
-            const newWidth = Math.max(200, startWidth + (moveEvent.clientX - startX));
-            const newHeight = Math.max(200, startHeight + (moveEvent.clientY - startY));
-            
-            if (memoRef.current) {
-                memoRef.current.style.width = `${newWidth}px`;
-                memoRef.current.style.height = `${newHeight}px`;
-            }
-        };
-
-        const handleMouseUp = (upEvent: MouseEvent) => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-            
-            const newWidth = Math.max(200, startWidth + (upEvent.clientX - startX));
-            const newHeight = Math.max(200, startHeight + (upEvent.clientY - startY));
-
-            handleUpdate(memo.id, { width: newWidth, height: newHeight });
-            setIsResizing(false);
-        };
-
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-      };
-
-      return (
-        <div 
-            ref={memoRef}
-            onMouseDown={handleDragStart}
-            style={{ 
-                position: 'absolute',
-                // IMPORTANT: Do NOT bind left/top/width/height here. 
-                // They are managed by useLayoutEffect and event handlers to avoid React render conflicts.
-                zIndex: isDragging || isResizing ? 9999 : 'auto' 
-            }}
-            className={`
-                p-5 rounded-lg shadow-md border ${COLORS[memo.color as keyof typeof COLORS]} 
-                flex flex-col transition-shadow hover:shadow-xl group
-                ${isDragging ? 'cursor-grabbing shadow-2xl opacity-90' : 'cursor-grab'}
-                ${isResizing ? 'cursor-se-resize' : ''}
-            `}
-        >
-            {/* Color Picker & Delete */}
-            <div className="flex justify-between items-start mb-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2 left-4 z-10">
-                <div 
-                    className="flex gap-1 bg-white/50 p-1 rounded-full backdrop-blur-sm"
-                    onMouseDown={(e) => e.stopPropagation()} // Prevent drag when clicking controls
-                >
-                    {Object.keys(COLORS).map((c) => (
-                        <button
-                            key={c}
-                            onClick={() => handleUpdate(memo.id, { color: c as any })}
-                            className={`w-3 h-3 rounded-full border border-gray-300 hover:scale-125 transition-transform ${COLORS[c as keyof typeof COLORS].split(' ')[0]}`}
-                        />
-                    ))}
-                </div>
-                <button 
-                    onClick={() => handleDelete(memo.id)}
-                    className="text-gray-500 hover:text-red-600 bg-white/50 p-1 rounded-full"
-                    onMouseDown={(e) => e.stopPropagation()}
-                >
-                    <Trash2 size={14} />
-                </button>
-            </div>
-
-            <textarea
-                value={localContent}
-                onChange={(e) => setLocalContent(e.target.value)}
-                onFocus={() => setIsFocused(true)}
-                onBlur={handleBlur}
-                className={`
-                    w-full h-full bg-transparent resize-none outline-none text-gray-800 
-                    placeholder:text-gray-500/50 mt-4 leading-relaxed font-medium cursor-text
-                    ${isDragging || isResizing ? 'pointer-events-none' : ''}
-                `}
-                placeholder="내용을 입력하세요..."
-                // Prevent drag initiation from textarea
-                onMouseDown={(e) => e.stopPropagation()}
-            />
-            
-            {/* Status Indicator */}
-            <div className="absolute bottom-3 left-4 text-[10px] text-gray-500 flex items-center gap-1 pointer-events-none select-none">
-                {isFocused && <span className="text-blue-600 animate-pulse">작성 중...</span>}
-                {!isFocused && localContent === memo.content && <span className="text-green-600 flex items-center gap-1"><Check size={10}/> Saved</span>}
-            </div>
-
-            {/* Resize Handle */}
-            <div 
-                className="resize-handle absolute bottom-0 right-0 w-8 h-8 flex items-end justify-end p-1.5 cursor-se-resize text-gray-400 hover:text-gray-600 z-20 hover:bg-black/5 rounded-tl-xl transition-colors"
-                onMouseDown={handleResizeStart}
-                title="크기 조절"
-            >
-                <GripHorizontal size={16} className="-rotate-45" />
-            </div>
-        </div>
-      );
   };
 
   return (
@@ -300,12 +297,16 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
         </button>
       </div>
 
-      {/* Canvas Area for Free Positioning */}
       <div className="flex-1 relative overflow-auto bg-gray-50/50 rounded-xl border border-dashed border-gray-200 shadow-inner">
-        {/* Render container to ensure scroll area exists if empty */}
         <div className="w-full h-full min-w-[1000px] min-h-[800px] relative">
             {memos.map(memo => (
-                <MemoCard key={memo.id} memo={memo} />
+                <MemoCard 
+                    key={memo.id} 
+                    memo={memo} 
+                    onUpdate={handleUpdate}
+                    onDelete={handleDelete}
+                    onBringToFront={bringToFront}
+                />
             ))}
             
             {memos.length === 0 && !loading && (
