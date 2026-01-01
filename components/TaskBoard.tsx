@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Task, TaskStatus, TaskPriority, SubTask } from '../types';
 import { Plus, Trash2, CheckSquare, Sparkles, Loader2, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
 import { generateTaskBreakdown } from '../services/geminiService';
+import { api } from '../services/api';
 
 interface TaskBoardProps {
   tasks: Task[];
@@ -20,13 +21,27 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
   const [newTaskDueDate, setNewTaskDueDate] = useState<string>('');
   const [generatedSubtasks, setGeneratedSubtasks] = useState<string[]>([]);
 
-  const handleStatusChange = (taskId: string, newStatus: TaskStatus) => {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+  // Helper to get current User ID
+  const getUserId = () => {
+    const userStr = localStorage.getItem('cloudops_user');
+    return userStr ? JSON.parse(userStr).id : 'unknown';
   };
 
-  const handleDelete = (taskId: string) => {
+  const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+    const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
+    setTasks(updatedTasks);
+    
+    // Sync with Backend
+    const task = updatedTasks.find(t => t.id === taskId);
+    if (task) {
+      await api.tasks.save(getUserId(), task);
+    }
+  };
+
+  const handleDelete = async (taskId: string) => {
     if (window.confirm('정말 이 작업을 삭제하시겠습니까? 삭제된 작업은 복구할 수 없습니다.')) {
       setTasks(prev => prev.filter(t => t.id !== taskId));
+      await api.tasks.delete(taskId);
     }
   };
 
@@ -41,7 +56,6 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
       if (result.suggestedTags.length > 0) {
         setNewTaskTags(result.suggestedTags.join(', '));
       }
-      // Map string priority to Enum if valid
       const p = result.prioritySuggestion as keyof typeof TaskPriority;
       if (TaskPriority[p]) {
         setNewTaskPriority(TaskPriority[p]);
@@ -49,7 +63,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
     }
   };
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!newTaskTitle) return;
 
     const subTasks: SubTask[] = generatedSubtasks.map((st, i) => ({
@@ -71,6 +85,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
     };
 
     setTasks(prev => [...prev, task]);
+    await api.tasks.save(getUserId(), task);
+    
     resetForm();
     setIsModalOpen(false);
   };

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, Plus, Tag, BookOpen, X, Hash, Trash2, Image as ImageIcon, ArrowLeft, Save, List, ListOrdered, Indent, Outdent, AlertCircle, FileText } from 'lucide-react';
 import { KnowledgeItem } from '../types';
+import { api } from '../services/api';
 
 interface KnowledgeBaseProps {
   items: KnowledgeItem[];
@@ -21,6 +22,11 @@ const getSafeContent = (content: string) => {
 const stripHtml = (html: string) => {
    const doc = new DOMParser().parseFromString(html, 'text/html');
    return doc.body.textContent || "";
+};
+
+const getUserId = () => {
+    const userStr = localStorage.getItem('cloudops_user');
+    return userStr ? JSON.parse(userStr).id : 'unknown';
 };
 
 export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems }) => {
@@ -111,7 +117,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
     exitEditor();
   };
 
-  const handleAddItem = (isDraft: boolean) => {
+  const handleAddItem = async (isDraft: boolean) => {
     const finalTitle = newTitle.trim() || (isDraft ? '(제목 없음)' : '');
     if (!finalTitle && !isDraft) return;
 
@@ -133,13 +139,16 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
       // Otherwise add new
       return [newItem, ...prev];
     });
+
+    await api.knowledge.save(getUserId(), newItem);
   };
 
-  const handleDeleteItem = (id: string, e?: React.MouseEvent) => {
+  const handleDeleteItem = async (id: string, e?: React.MouseEvent) => {
      e?.stopPropagation();
      if(window.confirm('정말 삭제하시겠습니까?')) {
        setItems(prev => prev.filter(item => item.id !== id));
        if (viewingItem?.id === id) setViewingItem(null);
+       await api.knowledge.delete(id);
      }
   };
 
