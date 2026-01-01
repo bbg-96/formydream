@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Task, TaskStatus, TaskPriority, SubTask } from '../types';
-import { Plus, Trash2, CheckSquare, Sparkles, Loader2, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { Plus, Trash2, CheckSquare, Sparkles, Loader2, ChevronDown, ChevronUp, Calendar, Edit } from 'lucide-react';
 import { generateTaskBreakdown } from '../services/geminiService';
 import { api } from '../services/api';
 
@@ -13,13 +13,18 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   
-  // New Task Form State
+  // Edit State
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  
+  // New/Edit Task Form State
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDesc, setNewTaskDesc] = useState('');
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
   const [newTaskTags, setNewTaskTags] = useState<string>('');
   const [newTaskDueDate, setNewTaskDueDate] = useState<string>('');
   const [generatedSubtasks, setGeneratedSubtasks] = useState<string[]>([]);
+  // Store existing subtasks when editing to preserve their completion state
+  const [existingSubtasks, setExistingSubtasks] = useState<SubTask[]>([]);
 
   // Helper to get current User ID
   const getUserId = () => {
@@ -45,6 +50,24 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
     }
   };
 
+  const handleEdit = (task: Task) => {
+      setEditingTaskId(task.id);
+      setNewTaskTitle(task.title);
+      setNewTaskDesc(task.description || '');
+      setNewTaskPriority(task.priority);
+      setNewTaskDueDate(task.dueDate || '');
+      setNewTaskTags(task.tags.join(', '));
+      
+      // Separate existing subtasks. For editing, we might want a better UI to add/remove/check subtasks
+      // But for now, let's keep it simple: We map existing ones to generatedSubtasks string array for display
+      // Note: This simplifies structure, losing 'completed' status if we just map to string.
+      // To preserve 'completed', we store them in a separate state `existingSubtasks`.
+      setExistingSubtasks(task.subTasks);
+      setGeneratedSubtasks(task.subTasks.map(st => st.title));
+      
+      setIsModalOpen(true);
+  };
+
   const handleAiBreakdown = async () => {
     if (!newTaskTitle) return;
     setIsAiLoading(true);
@@ -52,10 +75,16 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
     setIsAiLoading(false);
 
     if (result) {
-      setGeneratedSubtasks(result.subtasks);
+      // Append new suggestions to existing ones
+      setGeneratedSubtasks(prev => [...prev, ...result.subtasks]);
       if (result.suggestedTags.length > 0) {
-        setNewTaskTags(result.suggestedTags.join(', '));
+        const currentTags = newTaskTags ? newTaskTags.split(',').map(t => t.trim()) : [];
+        const newTags = [...new Set([...currentTags, ...result.suggestedTags])];
+        setNewTaskTags(newTags.join(', '));
       }
+      
+      // Only set priority if it's currently default (MEDIUM) or user hasn't changed it manually? 
+      // For now, let AI overwrite if requested.
       const p = result.prioritySuggestion as keyof typeof TaskPriority;
       if (TaskPriority[p]) {
         setNewTaskPriority(TaskPriority[p]);
@@ -63,28 +92,51 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
     }
   };
 
-  const handleAddTask = async () => {
+  const handleSaveTask = async () => {
     if (!newTaskTitle) return;
 
-    const subTasks: SubTask[] = generatedSubtasks.map((st, i) => ({
-      id: `sub-${Date.now()}-${i}`,
-      title: st,
-      completed: false
-    }));
+    let subTasks: SubTask[];
+
+    if (editingTaskId) {
+        // Merge Logic: 
+        // 1. Existing subtasks that are still in 'generatedSubtasks' string list (by title match) keep their ID and status.
+        // 2. New strings in 'generatedSubtasks' get new IDs.
+        subTasks = generatedSubtasks.map((title, i) => {
+            const existing = existingSubtasks.find(st => st.title === title);
+            return existing ? existing : {
+                id: `sub-${Date.now()}-${i}`,
+                title: title,
+                completed: false
+            };
+        });
+    } else {
+        // Create Mode
+        subTasks = generatedSubtasks.map((st, i) => ({
+            id: `sub-${Date.now()}-${i}`,
+            title: st,
+            completed: false
+        }));
+    }
 
     const task: Task = {
-      id: `task-${Date.now()}`,
+      id: editingTaskId || `task-${Date.now()}`,
       title: newTaskTitle,
       description: newTaskDesc,
-      status: TaskStatus.TODO,
+      status: editingTaskId ? tasks.find(t => t.id === editingTaskId)?.status || TaskStatus.TODO : TaskStatus.TODO,
       priority: newTaskPriority,
       dueDate: newTaskDueDate || undefined,
       tags: newTaskTags.split(',').map(t => t.trim()).filter(Boolean),
       subTasks,
-      createdAt: new Date().toISOString(),
+      createdAt: editingTaskId ? tasks.find(t => t.id === editingTaskId)?.createdAt || new Date().toISOString() : new Date().toISOString(),
     };
 
-    setTasks(prev => [...prev, task]);
+    setTasks(prev => {
+        if (editingTaskId) {
+            return prev.map(t => t.id === editingTaskId ? task : t);
+        }
+        return [...prev, task];
+    });
+
     await api.tasks.save(getUserId(), task);
     
     resetForm();
@@ -92,12 +144,14 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
   };
 
   const resetForm = () => {
+    setEditingTaskId(null);
     setNewTaskTitle('');
     setNewTaskDesc('');
     setNewTaskPriority(TaskPriority.MEDIUM);
     setNewTaskTags('');
     setNewTaskDueDate('');
     setGeneratedSubtasks([]);
+    setExistingSubtasks([]);
   };
 
   const columns = [
@@ -112,7 +166,10 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">업무 보드</h2>
         <button
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => {
+              resetForm();
+              setIsModalOpen(true);
+          }}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
         >
           <Plus size={18} />
@@ -137,7 +194,8 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
                     key={task.id} 
                     task={task} 
                     onStatusChange={handleStatusChange} 
-                    onDelete={handleDelete} 
+                    onDelete={handleDelete}
+                    onEdit={handleEdit} 
                   />
                 ))}
               </div>
@@ -146,12 +204,12 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
         </div>
       </div>
 
-      {/* Add Task Modal */}
+      {/* Add/Edit Task Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in-up">
             <div className="p-6">
-              <h3 className="text-xl font-bold mb-4">새 작업 추가</h3>
+              <h3 className="text-xl font-bold mb-4">{editingTaskId ? '작업 수정' : '새 작업 추가'}</h3>
               
               <div className="space-y-4">
                 <div>
@@ -228,7 +286,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
                   
                   {generatedSubtasks.length > 0 && (
                     <div className="bg-white p-3 rounded-lg border border-indigo-100">
-                      <p className="text-xs font-bold text-gray-500 mb-2">제안된 하위 작업:</p>
+                      <p className="text-xs font-bold text-gray-500 mb-2">하위 작업 리스트:</p>
                       <ul className="space-y-1">
                         {generatedSubtasks.map((st, i) => (
                           <li key={i} className="flex items-center gap-2 text-sm text-gray-700">
@@ -243,9 +301,23 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
                               }}
                               className="w-full bg-transparent border-b border-transparent focus:border-indigo-300 outline-none"
                             />
+                            <button 
+                                onClick={() => {
+                                    setGeneratedSubtasks(prev => prev.filter((_, idx) => idx !== i));
+                                }}
+                                className="text-gray-400 hover:text-red-500"
+                            >
+                                <Trash2 size={12} />
+                            </button>
                           </li>
                         ))}
                       </ul>
+                      <button 
+                        onClick={() => setGeneratedSubtasks(prev => [...prev, ''])}
+                        className="mt-2 text-xs text-blue-600 flex items-center gap-1 hover:underline"
+                      >
+                          <Plus size={12} /> 항목 추가
+                      </button>
                     </div>
                   )}
                 </div>
@@ -260,10 +332,10 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
                   취소
                 </button>
                 <button
-                  onClick={handleAddTask}
+                  onClick={handleSaveTask}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
                 >
-                  작업 생성
+                  {editingTaskId ? '수정 저장' : '작업 생성'}
                 </button>
               </div>
             </div>
@@ -279,7 +351,8 @@ const TaskCard: React.FC<{
   task: Task; 
   onStatusChange: (id: string, s: TaskStatus) => void;
   onDelete: (id: string) => void;
-}> = ({ task, onStatusChange, onDelete }) => {
+  onEdit: (task: Task) => void;
+}> = ({ task, onStatusChange, onDelete, onEdit }) => {
   const [expanded, setExpanded] = useState(false);
 
   const priorityColor = {
@@ -295,9 +368,14 @@ const TaskCard: React.FC<{
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${priorityColor[task.priority]}`}>
           {task.priority}
         </span>
-        <button onClick={() => onDelete(task.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Trash2 size={14} />
-        </button>
+        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={() => onEdit(task)} className="text-gray-300 hover:text-blue-500">
+                <Edit size={14} />
+            </button>
+            <button onClick={() => onDelete(task.id)} className="text-gray-300 hover:text-red-500">
+                <Trash2 size={14} />
+            </button>
+        </div>
       </div>
       
       <h4 className="font-semibold text-gray-800 mb-1">{task.title}</h4>
