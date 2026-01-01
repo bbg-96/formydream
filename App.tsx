@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote, ChevronUp, ChevronDown, Palette, Check, Upload, X, Image as ImageIcon, Trash2, Move } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote, ChevronUp, ChevronDown, Palette, Check, Upload, X, Image as ImageIcon, Trash2, Move, Menu } from 'lucide-react';
 import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem, User, MailAccount, ThemeConfig } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TaskBoard } from './components/TaskBoard';
@@ -173,12 +173,16 @@ const App: React.FC = () => {
   const [currentTheme, setCurrentTheme] = useState<ThemeConfig>(THEMES[0]);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   
+  // Mobile UX State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   // Custom Background State
   const [customSidebarImage, setCustomSidebarImage] = useState<string | null>(null);
   const [customMainImage, setCustomMainImage] = useState<string | null>(null);
   
   // Position State for Custom Images
   const [mainImagePos, setMainImagePos] = useState<{x: number, y: number}>({ x: 50, y: 50 });
+  const [sidebarImagePos, setSidebarImagePos] = useState<{x: number, y: number}>({ x: 50, y: 50 });
 
   const sidebarFileRef = useRef<HTMLInputElement>(null);
   const mainFileRef = useRef<HTMLInputElement>(null);
@@ -209,12 +213,14 @@ const App: React.FC = () => {
     const savedMainBg = localStorage.getItem('cloudops_custom_main_bg');
     if (savedMainBg) setCustomMainImage(savedMainBg);
 
-    // Load Position
-    const savedPos = localStorage.getItem('cloudops_custom_main_pos');
-    if (savedPos) {
-        try {
-            setMainImagePos(JSON.parse(savedPos));
-        } catch(e) {}
+    // Load Positions
+    const savedMainPos = localStorage.getItem('cloudops_custom_main_pos');
+    if (savedMainPos) {
+        try { setMainImagePos(JSON.parse(savedMainPos)); } catch(e) {}
+    }
+    const savedSidebarPos = localStorage.getItem('cloudops_custom_sidebar_pos');
+    if (savedSidebarPos) {
+        try { setSidebarImagePos(JSON.parse(savedSidebarPos)); } catch(e) {}
     }
   }, []);
 
@@ -327,13 +333,19 @@ const App: React.FC = () => {
       localStorage.setItem('cloudops_custom_main_pos', JSON.stringify(newPos));
   };
 
+  const handleSidebarPosChange = (axis: 'x' | 'y', value: number) => {
+      const newPos = { ...sidebarImagePos, [axis]: value };
+      setSidebarImagePos(newPos);
+      localStorage.setItem('cloudops_custom_sidebar_pos', JSON.stringify(newPos));
+  };
+
   // Construct Final Styles combining Theme + Custom Images
   const finalSidebarStyle: React.CSSProperties = {
       ...currentTheme.sidebarStyle,
       ...(customSidebarImage ? {
           backgroundImage: `url(${customSidebarImage})`,
           backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundPosition: `${sidebarImagePos.x}% ${sidebarImagePos.y}%`,
           backgroundBlendMode: 'normal', // Ensure image shows normally without heavy blending
       } : {})
   };
@@ -357,7 +369,10 @@ const App: React.FC = () => {
     const isSelected = currentView === view;
     return (
       <button
-        onClick={() => setCurrentView(view)}
+        onClick={() => {
+            setCurrentView(view);
+            setIsMobileMenuOpen(false); // Close sidebar on mobile when item clicked
+        }}
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 
           ${isSelected 
             ? 'bg-white/20 shadow-sm text-white font-bold backdrop-blur-sm' 
@@ -376,9 +391,21 @@ const App: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
-      {/* Sidebar */}
+      {/* Mobile Backdrop Overlay */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 md:hidden transition-opacity"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Responsive Design */}
       <aside 
-        className="w-64 flex flex-col shadow-xl z-20 transition-all duration-500 ease-in-out relative"
+        className={`
+            fixed inset-y-0 left-0 z-40 w-64 shadow-xl transition-transform duration-300 ease-in-out md:relative md:translate-x-0
+            ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
+            flex flex-col relative
+        `}
         style={finalSidebarStyle}
       >
         {/* Dark overlay for readability if custom image exists */}
@@ -386,17 +413,26 @@ const App: React.FC = () => {
             <div className="absolute inset-0 bg-black/40 pointer-events-none z-0"></div>
         )}
 
-        <div className="p-6 flex items-center gap-3 border-b border-white/10 relative z-10">
-          <div className="p-2 bg-white/20 backdrop-blur-md rounded-lg shadow-sm">
-            <Cloud size={24} className="text-white" />
+        <div className="p-6 flex items-center gap-3 border-b border-white/10 relative z-10 justify-between md:justify-start">
+          <div className="flex items-center gap-3">
+              <div className="p-2 bg-white/20 backdrop-blur-md rounded-lg shadow-sm">
+                <Cloud size={24} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold tracking-wide text-white">CloudOps</h1>
+                <p className="text-xs text-white/60">Mate v1.0</p>
+              </div>
           </div>
-          <div>
-            <h1 className="text-lg font-bold tracking-wide text-white">CloudOps</h1>
-            <p className="text-xs text-white/60">Mate v1.0</p>
-          </div>
+          {/* Close button for mobile */}
+          <button 
+             onClick={() => setIsMobileMenuOpen(false)} 
+             className="md:hidden text-white/80 hover:text-white"
+          >
+              <X size={24} />
+          </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2 mt-4 relative z-10">
+        <nav className="flex-1 p-4 space-y-2 mt-4 relative z-10 overflow-y-auto">
           <SidebarItem view="DASHBOARD" icon={<LayoutDashboard size={20} />} label="대시보드" />
           <SidebarItem view="TASKS" icon={<ListTodo size={20} />} label="업무 관리" />
           <SidebarItem view="SCHEDULE" icon={<CalendarIcon size={20} />} label="일정" />
@@ -419,7 +455,7 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main 
-        className="flex-1 flex flex-col min-w-0 overflow-hidden relative transition-all duration-500"
+        className="flex-1 flex flex-col min-w-0 overflow-hidden relative transition-all duration-500 w-full"
         style={finalMainStyle}
       >
         
@@ -436,18 +472,28 @@ const App: React.FC = () => {
 
         {/* Header */}
         {showHeader && (
-          <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200/50 h-16 flex items-center justify-between px-8 shadow-sm z-10 transition-all">
-            <h2 className="text-xl font-bold text-gray-800 tracking-tight">
-              {currentView === 'DASHBOARD' && 'Dashboard'}
-              {currentView === 'TASKS' && 'Task Board'}
-              {currentView === 'SCHEDULE' && 'Schedule'}
-              {currentView === 'MAIL' && 'Mail Inbox'}
-              {currentView === 'MEMO' && 'Quick Sticky Notes'}
-              {currentView === 'KNOWLEDGE' && 'Knowledge Base'}
-              {currentView === 'AI_CHAT' && 'AI Support'}
-              {currentView === 'MY_PAGE' && 'My Page'}
-            </h2>
-            <div className="flex items-center gap-4">
+          <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200/50 h-16 flex items-center justify-between px-4 sm:px-8 shadow-sm z-10 transition-all">
+            <div className="flex items-center gap-3">
+                {/* Mobile Menu Trigger */}
+                <button
+                    onClick={() => setIsMobileMenuOpen(true)}
+                    className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                >
+                    <Menu size={24} />
+                </button>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight truncate">
+                {currentView === 'DASHBOARD' && 'Dashboard'}
+                {currentView === 'TASKS' && 'Task Board'}
+                {currentView === 'SCHEDULE' && 'Schedule'}
+                {currentView === 'MAIL' && 'Mail Inbox'}
+                {currentView === 'MEMO' && 'Quick Sticky Notes'}
+                {currentView === 'KNOWLEDGE' && 'Knowledge Base'}
+                {currentView === 'AI_CHAT' && 'AI Support'}
+                {currentView === 'MY_PAGE' && 'My Page'}
+                </h2>
+            </div>
+            
+            <div className="flex items-center gap-2 sm:gap-4">
               
               {/* Theme Selector */}
               <div className="relative" ref={themeMenuRef}>
@@ -488,7 +534,7 @@ const App: React.FC = () => {
                          <div className="px-4 py-2 border-t border-b border-gray-50 my-1 bg-gray-50/50">
                              <span className="text-xs font-bold text-gray-500 uppercase">커스텀 배경 설정</span>
                          </div>
-                         <div className="p-3 space-y-4">
+                         <div className="p-3 space-y-4 max-h-64 overflow-y-auto">
                              {/* Sidebar Custom */}
                              <div>
                                  <div className="flex justify-between items-center mb-1">
@@ -499,7 +545,7 @@ const App: React.FC = () => {
                                          </button>
                                      )}
                                  </div>
-                                 <div className="flex items-center gap-2">
+                                 <div className="flex items-center gap-2 mb-2">
                                      <button 
                                         onClick={() => sidebarFileRef.current?.click()}
                                         className="flex-1 border border-dashed border-gray-300 rounded-md p-1.5 text-xs text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-colors text-center"
@@ -508,6 +554,38 @@ const App: React.FC = () => {
                                      </button>
                                      <input type="file" ref={sidebarFileRef} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'SIDEBAR')} />
                                  </div>
+                                 {/* Sidebar Position Controls */}
+                                 {customSidebarImage && (
+                                    <div className="bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                        <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+                                            <Move size={10} /> <span>위치 조절 ({sidebarImagePos.x}%, {sidebarImagePos.y}%)</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-gray-400 w-3">X</span>
+                                                <input 
+                                                    type="range" 
+                                                    min="0" 
+                                                    max="100" 
+                                                    value={sidebarImagePos.x}
+                                                    onChange={(e) => handleSidebarPosChange('x', parseInt(e.target.value))}
+                                                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-gray-400 w-3">Y</span>
+                                                <input 
+                                                    type="range" 
+                                                    min="0" 
+                                                    max="100" 
+                                                    value={sidebarImagePos.y}
+                                                    onChange={(e) => handleSidebarPosChange('y', parseInt(e.target.value))}
+                                                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                 )}
                              </div>
 
                              {/* Main Content Custom */}
@@ -530,7 +608,7 @@ const App: React.FC = () => {
                                      <input type="file" ref={mainFileRef} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'MAIN')} />
                                  </div>
                                  
-                                 {/* Position Controls */}
+                                 {/* Main Position Controls */}
                                  {customMainImage && (
                                     <div className="bg-gray-50 p-2 rounded-lg border border-gray-100">
                                         <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
@@ -585,12 +663,12 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              <div className="w-px h-6 bg-gray-200 mx-1"></div>
+              <div className="w-px h-6 bg-gray-200 mx-1 hidden sm:block"></div>
 
               {/* Header Hide Button */}
               <button
                 onClick={() => setShowHeader(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors hidden sm:block"
                 title="상단바 숨기기"
               >
                 <ChevronUp size={20} />
