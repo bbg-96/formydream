@@ -18,34 +18,13 @@ const pool = new Pool({
   port: 5432,
 });
 
-// [DB Connection Test & Init]
+// [DB Connection Test]
 pool.connect(async (err, client, release) => {
   if (err) {
     console.error('Error acquiring client', err.stack);
     console.error('!!! DATABASE CONNECTION FAILED !!! - Check host, password, or network.');
   } else {
     console.log('>>> Database Connected Successfully to 10.200.0.159');
-    
-    // Auto-create memos table if not exists (For fresh setup only)
-    try {
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS memos (
-                id VARCHAR(50) PRIMARY KEY,
-                user_id INTEGER,
-                content TEXT,
-                color VARCHAR(20),
-                x INTEGER DEFAULT 0,
-                y INTEGER DEFAULT 0,
-                width INTEGER DEFAULT 280,
-                height INTEGER DEFAULT 280,
-                created_at TIMESTAMP
-            )
-        `);
-        console.log('>>> Memos Table Ready');
-    } catch(tableErr) {
-        console.error('Failed to create memos table', tableErr);
-    }
-    
     release();
   }
 });
@@ -203,6 +182,7 @@ app.put('/api/knowledge/:id', async (req, res) => {
 app.get('/api/memos', async (req, res) => {
     const { userId } = req.query;
     try {
+        // [수정] opacity 컬럼 추가 조회 (DB에 컬럼이 있다고 가정)
         const result = await pool.query('SELECT * FROM memos WHERE user_id = $1 ORDER BY created_at DESC', [userId]);
         const formatted = result.rows.map(row => ({
             id: row.id,
@@ -212,6 +192,7 @@ app.get('/api/memos', async (req, res) => {
             y: row.y || 0,
             width: row.width || 280,
             height: row.height || 280,
+            opacity: row.opacity ? parseFloat(row.opacity) : 1.0, 
             createdAt: row.created_at
         }));
         res.json(formatted);
@@ -222,14 +203,15 @@ app.get('/api/memos', async (req, res) => {
 });
 
 app.post('/api/memos', async (req, res) => {
-    const { id, userId, content, color, x, y, width, height, createdAt } = req.body;
+    const { id, userId, content, color, x, y, width, height, opacity, createdAt } = req.body;
     try {
+        // [수정] opacity 컬럼 추가 저장/업데이트 (DB에 컬럼이 있다고 가정)
         await pool.query(
-            `INSERT INTO memos (id, user_id, content, color, x, y, width, height, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            `INSERT INTO memos (id, user_id, content, color, x, y, width, height, opacity, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              ON CONFLICT (id) DO UPDATE SET
-               content=$3, color=$4, x=$5, y=$6, width=$7, height=$8`,
-            [id, userId, content, color, x || 0, y || 0, width || 280, height || 280, createdAt]
+               content=$3, color=$4, x=$5, y=$6, width=$7, height=$8, opacity=$9`,
+            [id, userId, content, color, x || 0, y || 0, width || 280, height || 280, opacity || 1.0, createdAt]
         );
         res.json({ success: true });
     } catch(err) {

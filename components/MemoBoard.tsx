@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Plus, Trash2, StickyNote, Check, GripHorizontal, List, Search, MapPin, X } from 'lucide-react';
+import { Plus, Trash2, StickyNote, Check, GripHorizontal, List, Search, MapPin, X, Droplets, Filter, ArrowUp, ArrowDown } from 'lucide-react';
 import { Memo } from '../types';
 import { api } from '../services/api';
 
@@ -28,6 +28,7 @@ const MemoCard: React.FC<MemoCardProps> = ({ memo, onUpdate, onDelete, onBringTo
     const [isFocused, setIsFocused] = useState(false);
     const [isResizing, setIsResizing] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [showOpacityControl, setShowOpacityControl] = useState(false);
     const memoRef = useRef<HTMLDivElement>(null);
 
     // Sync props to DOM styles ensuring React doesn't overwrite manual drag/resize updates.
@@ -59,6 +60,7 @@ const MemoCard: React.FC<MemoCardProps> = ({ memo, onUpdate, onDelete, onBringTo
         const target = e.target as HTMLElement;
         if (target.tagName === 'TEXTAREA') return; 
         if (target.closest('button')) return;
+        if (target.closest('input[type="range"]')) return; // Allow interaction with slider
         if (target.closest('.resize-handle')) return;
 
         e.preventDefault();
@@ -161,32 +163,60 @@ const MemoCard: React.FC<MemoCardProps> = ({ memo, onUpdate, onDelete, onBringTo
               position: 'absolute',
               // Visual optimization: High z-index during interaction. 
               // Using '1' instead of 'auto' creates a new stacking context so children (resize handle) don't bleed through other elements.
-              zIndex: isDragging || isResizing ? 9999 : 1 
+              zIndex: isDragging || isResizing ? 9999 : 1,
+              opacity: memo.opacity || 1
           }}
           className={`
               p-5 rounded-lg shadow-md border ${COLORS[memo.color as keyof typeof COLORS]} 
               flex flex-col transition-shadow hover:shadow-xl group
-              ${isDragging ? 'cursor-grabbing shadow-2xl opacity-90' : 'cursor-grab'}
+              ${isDragging ? 'cursor-grabbing shadow-2xl' : 'cursor-grab'}
               ${isResizing ? 'cursor-se-resize' : ''}
           `}
       >
-          {/* Color Picker & Delete */}
+          {/* Color Picker, Opacity & Delete */}
           <div className="flex justify-between items-start mb-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2 left-4 z-10">
               <div 
-                  className="flex gap-1 bg-white/50 p-1 rounded-full backdrop-blur-sm"
+                  className="flex gap-2 bg-white/50 p-1 rounded-full backdrop-blur-sm items-center"
                   onMouseDown={(e) => e.stopPropagation()} 
               >
-                  {Object.keys(COLORS).map((c) => (
-                      <button
-                          key={c}
-                          onClick={() => onUpdate(memo.id, { color: c as any })}
-                          className={`w-3 h-3 rounded-full border border-gray-300 hover:scale-125 transition-transform ${COLORS[c as keyof typeof COLORS].split(' ')[0]}`}
-                      />
-                  ))}
+                  <div className="flex gap-1">
+                    {Object.keys(COLORS).map((c) => (
+                        <button
+                            key={c}
+                            onClick={() => onUpdate(memo.id, { color: c as any })}
+                            className={`w-3 h-3 rounded-full border border-gray-300 hover:scale-125 transition-transform ${COLORS[c as keyof typeof COLORS].split(' ')[0]}`}
+                        />
+                    ))}
+                  </div>
+
+                  <div className="w-px h-3 bg-gray-300"></div>
+
+                  <div className="relative">
+                      <button 
+                        onClick={() => setShowOpacityControl(!showOpacityControl)}
+                        className="text-gray-500 hover:text-blue-600"
+                        title="투명도 조절"
+                      >
+                          <Droplets size={14} />
+                      </button>
+                      {showOpacityControl && (
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white p-2 rounded shadow-lg border border-gray-100 w-24">
+                              <input 
+                                type="range" 
+                                min="0.2" 
+                                max="1" 
+                                step="0.1" 
+                                value={memo.opacity || 1} 
+                                onChange={(e) => onUpdate(memo.id, { opacity: parseFloat(e.target.value) })}
+                                className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                              />
+                          </div>
+                      )}
+                  </div>
               </div>
               <button 
                   onClick={() => onDelete(memo.id)}
-                  className="text-gray-500 hover:text-red-600 bg-white/50 p-1 rounded-full"
+                  className="text-gray-500 hover:text-red-600 bg-white/50 p-1 rounded-full ml-1"
                   onMouseDown={(e) => e.stopPropagation()}
               >
                   <Trash2 size={14} />
@@ -233,6 +263,10 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
   // List View State
   const [showList, setShowList] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Filter & Sort State
+  const [filterColor, setFilterColor] = useState<string | 'ALL'>('ALL');
+  const [sortOrder, setSortOrder] = useState<'NEWEST' | 'OLDEST'>('NEWEST');
 
   useEffect(() => {
     loadMemos();
@@ -264,6 +298,7 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
       y: centerY + offset,
       width: 280,
       height: 280,
+      opacity: 1,
       createdAt: new Date().toISOString()
     };
     setMemos(prev => [...prev, newMemo]); 
@@ -321,6 +356,27 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
     
     bringToFront(id);
   };
+
+  // Logic for filtered list
+  const getFilteredMemos = () => {
+    let filtered = [...memos];
+    
+    // Filter by color
+    if (filterColor !== 'ALL') {
+        filtered = filtered.filter(m => m.color === filterColor);
+    }
+    
+    // Sort by date
+    filtered.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime();
+        const dateB = new Date(b.createdAt).getTime();
+        return sortOrder === 'NEWEST' ? dateB - dateA : dateA - dateB;
+    });
+    
+    return filtered;
+  };
+
+  const filteredMemosList = getFilteredMemos();
 
   // Calculate canvas size to allow scrolling if memos are far out
   // But also enforce a minimum size
@@ -404,11 +460,50 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
                       <X size={16} />
                   </button>
               </div>
+
+              {/* Filter & Sort Controls */}
+              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50 space-y-3">
+                  {/* Color Filter */}
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                      <Filter size={14} className="text-gray-400 shrink-0" />
+                      <button 
+                        onClick={() => setFilterColor('ALL')}
+                        className={`text-xs px-2 py-1 rounded-full whitespace-nowrap transition-colors ${filterColor === 'ALL' ? 'bg-slate-700 text-white' : 'bg-white border text-gray-500 hover:bg-gray-100'}`}
+                      >
+                        전체
+                      </button>
+                      {Object.keys(COLORS).map(c => (
+                          <button
+                             key={c}
+                             onClick={() => setFilterColor(c)}
+                             className={`w-5 h-5 rounded-full border border-gray-300 shrink-0 ${COLORS[c as keyof typeof COLORS].split(' ')[0]} ${filterColor === c ? 'ring-2 ring-offset-1 ring-blue-500' : ''}`}
+                             title={c}
+                          />
+                      ))}
+                  </div>
+                  {/* Date Sort */}
+                  <div className="flex justify-between items-center text-xs text-gray-500">
+                      <span>정렬 기준:</span>
+                      <button 
+                         onClick={() => setSortOrder(prev => prev === 'NEWEST' ? 'OLDEST' : 'NEWEST')}
+                         className="flex items-center gap-1 bg-white border px-2 py-1 rounded hover:bg-gray-50"
+                      >
+                          {sortOrder === 'NEWEST' ? (
+                              <><ArrowUp size={12} /> 최신순</>
+                          ) : (
+                              <><ArrowDown size={12} /> 오래된순</>
+                          )}
+                      </button>
+                  </div>
+              </div>
+
               <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                  {memos.length === 0 ? (
-                      <p className="text-center text-gray-400 text-sm py-4">목록 없음</p>
+                  {filteredMemosList.length === 0 ? (
+                      <p className="text-center text-gray-400 text-sm py-4">
+                          {memos.length === 0 ? "메모가 없습니다" : "검색 결과 없음"}
+                      </p>
                   ) : (
-                      memos.slice().reverse().map(memo => (
+                      filteredMemosList.map(memo => (
                           <div 
                             key={memo.id}
                             onClick={() => scrollToMemo(memo.id)}

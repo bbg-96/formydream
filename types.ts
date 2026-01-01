@@ -57,6 +57,7 @@ export interface Memo {
   y?: number;
   width?: number; // Added for resizing
   height?: number; // Added for resizing
+  opacity?: number; // Added for transparency
 }
 
 export interface Email {
