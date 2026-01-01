@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
-import { Plus, Trash2, StickyNote, Check, GripHorizontal } from 'lucide-react';
+import { Plus, Trash2, StickyNote, Check, GripHorizontal, List, Search, MapPin, X } from 'lucide-react';
 import { Memo } from '../types';
 import { api } from '../services/api';
 
@@ -72,16 +72,22 @@ const MemoCard: React.FC<MemoCardProps> = ({ memo, onUpdate, onDelete, onBringTo
         const rect = memoRef.current?.getBoundingClientRect();
         const parentRect = memoRef.current?.parentElement?.getBoundingClientRect();
         
-        const initialX = rect && parentRect ? rect.left - parentRect.left + (memoRef.current?.parentElement?.scrollLeft || 0) : (memo.x || 0);
-        const initialY = rect && parentRect ? rect.top - parentRect.top + (memoRef.current?.parentElement?.scrollTop || 0) : (memo.y || 0);
+        // Calculate initial relative position
+        const currentLeft = rect && parentRect ? rect.left - parentRect.left + (memoRef.current?.parentElement?.scrollLeft || 0) : (memo.x || 0);
+        const currentTop = rect && parentRect ? rect.top - parentRect.top + (memoRef.current?.parentElement?.scrollTop || 0) : (memo.y || 0);
 
         const handleMouseMove = (me: MouseEvent) => {
             const dx = me.clientX - startX;
             const dy = me.clientY - startY;
             
+            // Apply Boundary Constraint (Prevent negative coordinates)
+            // This fixes the issue where memos get hidden top/left
+            const newX = Math.max(0, currentLeft + dx);
+            const newY = Math.max(0, currentTop + dy);
+            
             if (memoRef.current) {
-                memoRef.current.style.left = `${initialX + dx}px`;
-                memoRef.current.style.top = `${initialY + dy}px`;
+                memoRef.current.style.left = `${newX}px`;
+                memoRef.current.style.top = `${newY}px`;
             }
         };
 
@@ -92,8 +98,12 @@ const MemoCard: React.FC<MemoCardProps> = ({ memo, onUpdate, onDelete, onBringTo
             const dx = ue.clientX - startX;
             const dy = ue.clientY - startY;
             
+            // Final Boundary Check
+            const finalX = Math.max(0, currentLeft + dx);
+            const finalY = Math.max(0, currentTop + dy);
+            
             if (dx !== 0 || dy !== 0) {
-                onUpdate(memo.id, { x: initialX + dx, y: initialY + dy });
+                onUpdate(memo.id, { x: finalX, y: finalY });
             }
             
             // Reorder only after drag finishes
@@ -149,8 +159,9 @@ const MemoCard: React.FC<MemoCardProps> = ({ memo, onUpdate, onDelete, onBringTo
           onMouseDown={handleDragStart}
           style={{ 
               position: 'absolute',
-              // Visual optimization: High z-index during interaction
-              zIndex: isDragging || isResizing ? 9999 : 'auto' 
+              // Visual optimization: High z-index during interaction. 
+              // Using '1' instead of 'auto' creates a new stacking context so children (resize handle) don't bleed through other elements.
+              zIndex: isDragging || isResizing ? 9999 : 1 
           }}
           className={`
               p-5 rounded-lg shadow-md border ${COLORS[memo.color as keyof typeof COLORS]} 
@@ -218,6 +229,10 @@ const MemoCard: React.FC<MemoCardProps> = ({ memo, onUpdate, onDelete, onBringTo
 export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
   const [memos, setMemos] = useState<Memo[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // List View State
+  const [showList, setShowList] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadMemos();
@@ -231,13 +246,22 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
   };
 
   const handleAddMemo = async () => {
+    // Determine center of current view for new memo placement
+    let centerX = 50;
+    let centerY = 50;
+    
+    if (containerRef.current) {
+        centerX = containerRef.current.scrollLeft + 100;
+        centerY = containerRef.current.scrollTop + 100;
+    }
+
     const offset = Math.floor(Math.random() * 40);
     const newMemo: Memo = {
       id: `memo-${Date.now()}`,
       content: '',
       color: 'YELLOW',
-      x: 50 + offset,
-      y: 50 + offset,
+      x: centerX + offset,
+      y: centerY + offset,
       width: 280,
       height: 280,
       createdAt: new Date().toISOString()
@@ -278,44 +302,139 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
       });
   };
 
+  // Scroll to specific memo functionality
+  const scrollToMemo = (id: string) => {
+    const memo = memos.find(m => m.id === id);
+    if (!memo || !containerRef.current) return;
+
+    const container = containerRef.current;
+    
+    // Calculate position to center the memo
+    const targetX = (memo.x || 0) - (container.clientWidth / 2) + ((memo.width || 280) / 2);
+    const targetY = (memo.y || 0) - (container.clientHeight / 2) + ((memo.height || 280) / 2);
+
+    container.scrollTo({
+        left: Math.max(0, targetX),
+        top: Math.max(0, targetY),
+        behavior: 'smooth'
+    });
+    
+    bringToFront(id);
+  };
+
+  // Calculate canvas size to allow scrolling if memos are far out
+  // But also enforce a minimum size
+  const maxWidth = memos.reduce((max, m) => Math.max(max, (m.x || 0) + (m.width || 280) + 200), 2000);
+  const maxHeight = memos.reduce((max, m) => Math.max(max, (m.y || 0) + (m.height || 280) + 200), 1600);
+
   return (
-    <div className="h-full flex flex-col p-6 overflow-hidden">
+    <div className="h-full flex flex-col p-6 overflow-hidden relative">
       <div className="flex justify-between items-center mb-6 z-10 relative">
         <div>
             <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
             <StickyNote className="text-yellow-500" />
             퀵 메모
             </h2>
-            <p className="text-sm text-gray-500">배경을 드래그하여 자유롭게 배치하고 모서리를 잡아 크기를 조절하세요.</p>
+            <p className="text-sm text-gray-500">
+                메모는 좌측/상단 경계를 넘어갈 수 없습니다.
+            </p>
         </div>
-        <button
-          onClick={handleAddMemo}
-          className="flex items-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-4 py-2 rounded-lg transition-colors shadow-sm font-bold"
-        >
-          <Plus size={18} />
-          새 메모
-        </button>
+        <div className="flex gap-2">
+            <button
+                onClick={() => setShowList(!showList)}
+                className={`p-2 rounded-lg transition-colors border ${showList ? 'bg-blue-100 text-blue-600 border-blue-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                title="메모 리스트 보기"
+            >
+                <List size={20} />
+            </button>
+            <button
+            onClick={handleAddMemo}
+            className="flex items-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-4 py-2 rounded-lg transition-colors shadow-sm font-bold"
+            >
+            <Plus size={18} />
+            새 메모
+            </button>
+        </div>
       </div>
 
-      <div className="flex-1 relative overflow-auto bg-gray-50/50 rounded-xl border border-dashed border-gray-200 shadow-inner">
-        <div className="w-full h-full min-w-[1000px] min-h-[800px] relative">
-            {memos.map(memo => (
-                <MemoCard 
-                    key={memo.id} 
-                    memo={memo} 
-                    onUpdate={handleUpdate}
-                    onDelete={handleDelete}
-                    onBringToFront={bringToFront}
-                />
-            ))}
-            
-            {memos.length === 0 && !loading && (
-                 <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 pointer-events-none">
-                    <StickyNote size={48} className="mb-2 opacity-20" />
-                    <p>작성된 메모가 없습니다.</p>
-                 </div>
-            )}
-        </div>
+      <div className="flex-1 flex overflow-hidden gap-4 relative">
+          {/* Canvas Area */}
+          <div 
+            ref={containerRef}
+            className="flex-1 relative overflow-auto bg-gray-50/50 rounded-xl border border-dashed border-gray-200 shadow-inner scroll-smooth"
+          >
+            <div 
+                className="relative"
+                style={{ 
+                    width: `${maxWidth}px`, 
+                    height: `${maxHeight}px` 
+                }}
+            >
+                {memos.map(memo => (
+                    <MemoCard 
+                        key={memo.id} 
+                        memo={memo} 
+                        onUpdate={handleUpdate}
+                        onDelete={handleDelete}
+                        onBringToFront={bringToFront}
+                    />
+                ))}
+                
+                {memos.length === 0 && !loading && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-400 pointer-events-none">
+                        <StickyNote size={48} className="mb-2 opacity-20" />
+                        <p>작성된 메모가 없습니다.</p>
+                    </div>
+                )}
+            </div>
+          </div>
+
+          {/* Sidebar List View */}
+          <div 
+            className={`
+                bg-white border border-gray-200 rounded-xl shadow-lg transition-all duration-300 overflow-hidden flex flex-col
+                ${showList ? 'w-80 opacity-100' : 'w-0 opacity-0 border-0'}
+            `}
+          >
+              <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                  <h3 className="font-bold text-gray-700 flex items-center gap-2">
+                      <List size={16} /> 메모 목록
+                  </h3>
+                  <button onClick={() => setShowList(false)} className="text-gray-400 hover:text-gray-600">
+                      <X size={16} />
+                  </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                  {memos.length === 0 ? (
+                      <p className="text-center text-gray-400 text-sm py-4">목록 없음</p>
+                  ) : (
+                      memos.slice().reverse().map(memo => (
+                          <div 
+                            key={memo.id}
+                            onClick={() => scrollToMemo(memo.id)}
+                            className="group p-3 rounded-lg border border-gray-100 hover:border-blue-200 hover:shadow-sm cursor-pointer transition-all bg-white relative overflow-hidden"
+                          >
+                              {/* Color Indicator Strip */}
+                              <div className={`absolute left-0 top-0 bottom-0 w-1 ${COLORS[memo.color as keyof typeof COLORS].split(' ')[0]}`}></div>
+                              
+                              <div className="pl-2">
+                                  <p className="text-sm text-gray-800 line-clamp-2 font-medium">
+                                      {memo.content || '(내용 없음)'}
+                                  </p>
+                                  <div className="flex justify-between items-end mt-2">
+                                      <span className="text-[10px] text-gray-400">
+                                          {new Date(memo.createdAt).toLocaleDateString()}
+                                      </span>
+                                      <span className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] flex items-center gap-1">
+                                          <MapPin size={10} /> 이동
+                                      </span>
+                                  </div>
+                              </div>
+                          </div>
+                      ))
+                  )}
+              </div>
+          </div>
       </div>
     </div>
   );
