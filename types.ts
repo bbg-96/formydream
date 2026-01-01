@@ -74,6 +74,7 @@ export interface MailAccount {
   emails: Email[];
   lastUpdated: Date;
   isConnected: boolean;
+  latestUid?: string | number; // For incremental sync
 }
 
 export interface AIBreakdownResponse {

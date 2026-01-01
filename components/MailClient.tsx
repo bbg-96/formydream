@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, RefreshCw, Plus, Calendar, CheckSquare, Search, User, Clock, AlertCircle, Inbox, Send, Loader2, Server, ShieldCheck, ChevronDown, Trash2 } from 'lucide-react';
+import { Mail, RefreshCw, Plus, Calendar, CheckSquare, Search, User, Clock, AlertCircle, Inbox, Send, Loader2, Server, ShieldCheck, ChevronDown, Trash2, BellRing } from 'lucide-react';
 import { Email, Task, TaskPriority, TaskStatus, MailAccount, MailConfig } from '../types';
 import { api } from '../services/api';
 
@@ -68,17 +68,20 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks, mailAcco
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    // 1. Validate connection
     const success = await api.mail.connect(user.id, mailConfig);
     
     if (success) {
-      // First Fetch
-      const msgs = await api.mail.getMessages(user.id, mailConfig);
+      // 2. Initial Sync (Get Last UID only, No Emails)
+      // Pass 'undefined' for lastUid to trigger initial mode
+      const { emails, latestUid } = await api.mail.getMessages(user.id, mailConfig, undefined);
       
       const newAccount: MailAccount = {
         id: `acc-${Date.now()}`,
         name: accountAlias || mailConfig.email,
         config: mailConfig,
-        emails: msgs,
+        emails: [], // Start empty as requested
+        latestUid: latestUid, 
         lastUpdated: new Date(),
         isConnected: true
       };
@@ -109,11 +112,18 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks, mailAcco
     if (!account) return;
 
     setLoading(true);
-    const msgs = await api.mail.getMessages(user.id, account.config);
+    // Incremental Sync
+    const { emails: newEmails, latestUid } = await api.mail.getMessages(user.id, account.config, account.latestUid);
     
     setMailAccounts(prev => prev.map(a => {
       if (a.id === selectedAccountId) {
-        return { ...a, emails: msgs, lastUpdated: new Date() };
+        // Prepend new emails to existing list
+        return { 
+            ...a, 
+            emails: [...newEmails, ...a.emails], 
+            latestUid: latestUid,
+            lastUpdated: new Date() 
+        };
       }
       return a;
     }));
@@ -321,7 +331,7 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks, mailAcco
                     <button 
                         onClick={refreshCurrentAccount} 
                         className={`p-2 hover:bg-white border border-transparent hover:border-gray-200 rounded-lg text-gray-500 transition-all ${loading ? 'animate-spin' : ''}`}
-                        title="새로고침"
+                        title="새로고침 (새 메일 확인)"
                     >
                         <RefreshCw size={16} />
                     </button>
@@ -329,9 +339,22 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks, mailAcco
 
                 <div className="flex-1 overflow-y-auto">
                     {activeAccount.emails.length === 0 ? (
-                        <div className="text-center py-10 text-gray-400">
-                        <Mail size={32} className="mx-auto mb-2 opacity-30" />
-                        <p className="text-sm">메일이 없습니다.</p>
+                        <div className="flex flex-col items-center justify-center h-full text-center p-6">
+                            <div className="bg-indigo-50 p-4 rounded-full mb-3 animate-pulse">
+                                <BellRing size={24} className="text-indigo-500" />
+                            </div>
+                            <h4 className="font-bold text-gray-700 text-sm">최신 메일 대기 중</h4>
+                            <p className="text-xs text-gray-400 mt-1 leading-relaxed">
+                                기존 메일은 불러오지 않았습니다.<br/>
+                                새로 도착하는 메일만 이곳에 표시됩니다.
+                            </p>
+                            <button 
+                                onClick={refreshCurrentAccount} 
+                                className="mt-4 text-xs text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                                <RefreshCw size={10} />
+                                지금 확인하기
+                            </button>
                         </div>
                     ) : (
                         activeAccount.emails.map(email => (

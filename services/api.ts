@@ -145,18 +145,17 @@ export const api = {
         return false;
       }
     },
-    // Updated: Send config (with password) via POST body to backend
-    getMessages: async (userId: string | number, config: any): Promise<Email[]> => {
+    getMessages: async (userId: string | number, config: any, lastUid?: string | number): Promise<{ emails: Email[], latestUid: string | number }> => {
       try {
         const response = await fetch(`${API_BASE_URL}/mail/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, config })
+            body: JSON.stringify({ userId, config, lastUid })
         });
         return handleResponse(response);
       } catch (e) {
         console.error("Failed to get messages", e);
-        return [];
+        return { emails: [], latestUid: lastUid || 0 };
       }
     }
   }
