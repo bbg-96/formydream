@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote, ChevronUp, ChevronDown, Palette, Check, Upload, X, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote, ChevronUp, ChevronDown, Palette, Check, Upload, X, Image as ImageIcon, Trash2, Move } from 'lucide-react';
 import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem, User, MailAccount, ThemeConfig } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TaskBoard } from './components/TaskBoard';
@@ -176,6 +176,10 @@ const App: React.FC = () => {
   // Custom Background State
   const [customSidebarImage, setCustomSidebarImage] = useState<string | null>(null);
   const [customMainImage, setCustomMainImage] = useState<string | null>(null);
+  
+  // Position State for Custom Images
+  const [mainImagePos, setMainImagePos] = useState<{x: number, y: number}>({ x: 50, y: 50 });
+
   const sidebarFileRef = useRef<HTMLInputElement>(null);
   const mainFileRef = useRef<HTMLInputElement>(null);
 
@@ -205,6 +209,13 @@ const App: React.FC = () => {
     const savedMainBg = localStorage.getItem('cloudops_custom_main_bg');
     if (savedMainBg) setCustomMainImage(savedMainBg);
 
+    // Load Position
+    const savedPos = localStorage.getItem('cloudops_custom_main_pos');
+    if (savedPos) {
+        try {
+            setMainImagePos(JSON.parse(savedPos));
+        } catch(e) {}
+    }
   }, []);
 
   // Handle click outside for theme menu
@@ -310,6 +321,12 @@ const App: React.FC = () => {
       }
   };
 
+  const handleMainPosChange = (axis: 'x' | 'y', value: number) => {
+      const newPos = { ...mainImagePos, [axis]: value };
+      setMainImagePos(newPos);
+      localStorage.setItem('cloudops_custom_main_pos', JSON.stringify(newPos));
+  };
+
   // Construct Final Styles combining Theme + Custom Images
   const finalSidebarStyle: React.CSSProperties = {
       ...currentTheme.sidebarStyle,
@@ -317,8 +334,7 @@ const App: React.FC = () => {
           backgroundImage: `url(${customSidebarImage})`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          backgroundColor: '#000', // Fallback
-          backgroundBlendMode: 'overlay', // Blend with currentTheme background or simple overlay
+          backgroundBlendMode: 'normal', // Ensure image shows normally without heavy blending
       } : {})
   };
 
@@ -330,7 +346,7 @@ const App: React.FC = () => {
       ...(customMainImage ? {
           backgroundImage: `url(${customMainImage})`,
           backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundPosition: `${mainImagePos.x}% ${mainImagePos.y}%`,
           backgroundAttachment: 'fixed' // Parallax feel
       } : {})
   };
@@ -444,7 +460,7 @@ const App: React.FC = () => {
                  </button>
 
                  {isThemeMenuOpen && (
-                     <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-fade-in-up">
+                     <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-fade-in-up">
                          {/* Default Themes */}
                          <div className="px-4 py-2 border-b border-gray-50 mb-1">
                              <span className="text-xs font-bold text-gray-500 uppercase">기본 테마 선택</span>
@@ -472,7 +488,7 @@ const App: React.FC = () => {
                          <div className="px-4 py-2 border-t border-b border-gray-50 my-1 bg-gray-50/50">
                              <span className="text-xs font-bold text-gray-500 uppercase">커스텀 배경 설정</span>
                          </div>
-                         <div className="p-3 space-y-3">
+                         <div className="p-3 space-y-4">
                              {/* Sidebar Custom */}
                              <div>
                                  <div className="flex justify-between items-center mb-1">
@@ -504,7 +520,7 @@ const App: React.FC = () => {
                                          </button>
                                      )}
                                  </div>
-                                 <div className="flex items-center gap-2">
+                                 <div className="flex items-center gap-2 mb-2">
                                      <button 
                                         onClick={() => mainFileRef.current?.click()}
                                         className="flex-1 border border-dashed border-gray-300 rounded-md p-1.5 text-xs text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-colors text-center"
@@ -513,6 +529,39 @@ const App: React.FC = () => {
                                      </button>
                                      <input type="file" ref={mainFileRef} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'MAIN')} />
                                  </div>
+                                 
+                                 {/* Position Controls */}
+                                 {customMainImage && (
+                                    <div className="bg-gray-50 p-2 rounded-lg border border-gray-100">
+                                        <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
+                                            <Move size={10} /> <span>위치 조절 ({mainImagePos.x}%, {mainImagePos.y}%)</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-gray-400 w-3">X</span>
+                                                <input 
+                                                    type="range" 
+                                                    min="0" 
+                                                    max="100" 
+                                                    value={mainImagePos.x}
+                                                    onChange={(e) => handleMainPosChange('x', parseInt(e.target.value))}
+                                                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                                />
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-gray-400 w-3">Y</span>
+                                                <input 
+                                                    type="range" 
+                                                    min="0" 
+                                                    max="100" 
+                                                    value={mainImagePos.y}
+                                                    onChange={(e) => handleMainPosChange('y', parseInt(e.target.value))}
+                                                    className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                 )}
                              </div>
                          </div>
                      </div>
