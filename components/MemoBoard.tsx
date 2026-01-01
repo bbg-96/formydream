@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import { Plus, Trash2, StickyNote, Check, GripHorizontal } from 'lucide-react';
 import { Memo } from '../types';
 import { api } from '../services/api';
@@ -93,6 +93,22 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
       const [isDragging, setIsDragging] = useState(false);
       const memoRef = useRef<HTMLDivElement>(null);
 
+      // [CRITICAL FIX]
+      // Sync props to DOM styles ensuring React doesn't overwrite manual drag/resize updates.
+      // We use useLayoutEffect to prevent FOUC (Flash of Unstyled Content) and ensure sync before paint.
+      useLayoutEffect(() => {
+          if (memoRef.current) {
+              // Only apply props-based styles if we are NOT actively interacting.
+              // This allows the drag/resize handlers to manipulate the DOM directly without React interference.
+              if (!isDragging && !isResizing) {
+                  memoRef.current.style.left = `${memo.x || 0}px`;
+                  memoRef.current.style.top = `${memo.y || 0}px`;
+                  memoRef.current.style.width = `${memo.width || 280}px`;
+                  memoRef.current.style.height = `${memo.height || 280}px`;
+              }
+          }
+      }, [memo.x, memo.y, memo.width, memo.height, isDragging, isResizing]);
+
       useEffect(() => {
           setLocalContent(memo.content);
       }, [memo.content]);
@@ -118,8 +134,13 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
 
           const startX = e.clientX;
           const startY = e.clientY;
-          const initialX = memo.x || 0;
-          const initialY = memo.y || 0;
+          // Use current DOM position as source of truth for smooth start
+          const rect = memoRef.current?.getBoundingClientRect();
+          const parentRect = memoRef.current?.parentElement?.getBoundingClientRect();
+          
+          // Calculate relative position inside the container
+          const initialX = rect && parentRect ? rect.left - parentRect.left + (memoRef.current?.parentElement?.scrollLeft || 0) : (memo.x || 0);
+          const initialY = rect && parentRect ? rect.top - parentRect.top + (memoRef.current?.parentElement?.scrollTop || 0) : (memo.y || 0);
 
           const handleMouseMove = (me: MouseEvent) => {
               const dx = me.clientX - startX;
@@ -134,15 +155,16 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
           const handleMouseUp = (ue: MouseEvent) => {
               document.removeEventListener('mousemove', handleMouseMove);
               document.removeEventListener('mouseup', handleMouseUp);
-              setIsDragging(false);
-
+              
               const dx = ue.clientX - startX;
               const dy = ue.clientY - startY;
               
-              // Only save if moved
+              // Update state and DB
               if (dx !== 0 || dy !== 0) {
                   handleUpdate(memo.id, { x: initialX + dx, y: initialY + dy });
               }
+              // Set dragging to false AFTER update to ensure effect syncs with new position
+              setIsDragging(false);
           };
 
           document.addEventListener('mousemove', handleMouseMove);
@@ -158,8 +180,8 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
 
         const startX = e.clientX;
         const startY = e.clientY;
-        const startWidth = memo.width || 280;
-        const startHeight = memo.height || 280;
+        const startWidth = memoRef.current?.offsetWidth || memo.width || 280;
+        const startHeight = memoRef.current?.offsetHeight || memo.height || 280;
 
         const handleMouseMove = (moveEvent: MouseEvent) => {
             const newWidth = Math.max(200, startWidth + (moveEvent.clientX - startX));
@@ -174,12 +196,12 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
         const handleMouseUp = (upEvent: MouseEvent) => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
-            setIsResizing(false);
             
             const newWidth = Math.max(200, startWidth + (upEvent.clientX - startX));
             const newHeight = Math.max(200, startHeight + (upEvent.clientY - startY));
 
             handleUpdate(memo.id, { width: newWidth, height: newHeight });
+            setIsResizing(false);
         };
 
         document.addEventListener('mousemove', handleMouseMove);
@@ -192,10 +214,8 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
             onMouseDown={handleDragStart}
             style={{ 
                 position: 'absolute',
-                left: memo.x || 0,
-                top: memo.y || 0,
-                width: memo.width || 280, 
-                height: memo.height || 280,
+                // IMPORTANT: Do NOT bind left/top/width/height here. 
+                // They are managed by useLayoutEffect and event handlers to avoid React render conflicts.
                 zIndex: isDragging || isResizing ? 9999 : 'auto' 
             }}
             className={`
