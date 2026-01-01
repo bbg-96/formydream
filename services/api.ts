@@ -140,52 +140,71 @@ export const api = {
   },
   mail: {
     connect: async (userId: string | number, config: any): Promise<boolean> => {
+      // [UI Demo Mode] 
+      // 실제 백엔드가 없으므로 404 에러를 방지하기 위해 네트워크 요청을 생략하고 성공을 시뮬레이션합니다.
+      console.log(`[Mail Simulation] Connecting to ${config.host}:${config.port} (${config.protocol}) via SSL:${config.useSSL}...`);
+      
+      // 1.5초 딜레이 시뮬레이션
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      return true;
+
+      /* 실제 연동 코드 (백엔드 준비 시 주석 해제)
       try {
-        // Mock connection check for UI demo purposes if backend fails
-        try {
-            const response = await fetch(`${API_BASE_URL}/mail/connect`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...config, userId }),
-            });
-            return response.ok;
-        } catch (e) {
-            console.warn("Mail backend unavailable, simulating success for demo");
-            return true; 
-        }
+        const response = await fetch(`${API_BASE_URL}/mail/connect`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...config, userId }),
+        });
+        return response.ok;
       } catch (e) {
         console.error("Failed to connect mail", e);
         return false;
       }
+      */
     },
     getMessages: async (userId: string | number): Promise<Email[]> => {
+      // [UI Demo Mode] 가짜 데이터 반환
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      return [
+        {
+          id: 'm1',
+          senderName: 'AWS Billing',
+          senderAddress: 'no-reply-aws@amazon.com',
+          subject: '[Alert] AWS Budget Alert - Monthly Budget Exceeded',
+          body: 'Dear Customer,\n\nYou have exceeded 85% of your monthly budget for "Production-Account".\nCurrent Spend: $1,250.00\nForecast: $1,600.00\n\nPlease review your usage in Cost Explorer.',
+          receivedAt: new Date().toISOString(),
+          isRead: false
+        },
+        {
+          id: 'm2',
+          senderName: 'Jira Notification',
+          senderAddress: 'jira@company.com',
+          subject: 'New Ticket Assigned: PROD-1234 DB Connection Timeout',
+          body: 'A new high priority ticket has been assigned to you.\n\nDescription: Application servers are experiencing intermittent timeouts connecting to Primary RDS instance.\n\nPriority: High\nReporter: QA Team',
+          receivedAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+          isRead: true
+        },
+        {
+            id: 'm3',
+            senderName: 'Datadog Alerts',
+            senderAddress: 'alerts@datadoghq.com',
+            subject: '[P1] High CPU Usage on k8s-worker-node-05',
+            body: 'Monitor "K8s Node CPU" triggered.\n\nValue: 98.5%\nThreshold: > 90%\nHost: k8s-worker-node-05\n\nPlease investigate immediately.',
+            receivedAt: new Date(Date.now() - 7200000).toISOString(),
+            isRead: true
+        }
+      ];
+
+      /* 실제 연동 코드
       try {
         const uidStr = String(userId);
         const response = await fetch(`${API_BASE_URL}/mail/messages?userId=${uidStr}`);
         return handleResponse(response);
       } catch (e) {
-        // Fallback Mock Data
-        return [
-          {
-            id: 'm1',
-            senderName: 'AWS Billing',
-            senderAddress: 'no-reply-aws@amazon.com',
-            subject: '[Alert] AWS Budget Alert - Monthly Budget Exceeded',
-            body: 'Dear Customer,\n\nYou have exceeded 85% of your monthly budget for "Production-Account".\nCurrent Spend: $1,250.00\nForecast: $1,600.00\n\nPlease review your usage in Cost Explorer.',
-            receivedAt: new Date().toISOString(),
-            isRead: false
-          },
-          {
-            id: 'm2',
-            senderName: 'Jira Notification',
-            senderAddress: 'jira@company.com',
-            subject: 'New Ticket Assigned: PROD-1234 DB Connection Timeout',
-            body: 'A new high priority ticket has been assigned to you.\n\nDescription: Application servers are experiencing intermittent timeouts connecting to Primary RDS instance.\n\nPriority: High\nReporter: QA Team',
-            receivedAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-            isRead: true
-          }
-        ];
+        return [];
       }
+      */
     }
   }
 };
