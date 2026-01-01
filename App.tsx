@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote, ChevronUp, ChevronDown, Palette, Check } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote, ChevronUp, ChevronDown, Palette, Check, Upload, X, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem, User, MailAccount, ThemeConfig } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TaskBoard } from './components/TaskBoard';
@@ -173,6 +173,12 @@ const App: React.FC = () => {
   const [currentTheme, setCurrentTheme] = useState<ThemeConfig>(THEMES[0]);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   
+  // Custom Background State
+  const [customSidebarImage, setCustomSidebarImage] = useState<string | null>(null);
+  const [customMainImage, setCustomMainImage] = useState<string | null>(null);
+  const sidebarFileRef = useRef<HTMLInputElement>(null);
+  const mainFileRef = useRef<HTMLInputElement>(null);
+
   // Mail State (Lifted Up) with Persistence
   const [mailAccounts, setMailAccounts] = useState<MailAccount[]>([]);
   
@@ -192,6 +198,13 @@ const App: React.FC = () => {
       const found = THEMES.find(t => t.id === savedThemeId);
       if (found) setCurrentTheme(found);
     }
+    // Load Custom Images
+    const savedSidebarBg = localStorage.getItem('cloudops_custom_sidebar_bg');
+    if (savedSidebarBg) setCustomSidebarImage(savedSidebarBg);
+    
+    const savedMainBg = localStorage.getItem('cloudops_custom_main_bg');
+    if (savedMainBg) setCustomMainImage(savedMainBg);
+
   }, []);
 
   // Handle click outside for theme menu
@@ -260,21 +273,79 @@ const App: React.FC = () => {
   const changeTheme = (theme: ThemeConfig) => {
       setCurrentTheme(theme);
       localStorage.setItem('cloudops_theme_id', theme.id);
-      setIsThemeMenuOpen(false);
+      // setIsThemeMenuOpen(false); // Keep open to adjust custom images
   };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, type: 'SIDEBAR' | 'MAIN') => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      if (file.size > 4 * 1024 * 1024) { // 4MB Limit
+          alert("이미지 용량이 너무 큽니다. (최대 4MB)");
+          return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+          const base64 = reader.result as string;
+          if (type === 'SIDEBAR') {
+              setCustomSidebarImage(base64);
+              localStorage.setItem('cloudops_custom_sidebar_bg', base64);
+          } else {
+              setCustomMainImage(base64);
+              localStorage.setItem('cloudops_custom_main_bg', base64);
+          }
+      };
+      reader.readAsDataURL(file);
+      e.target.value = ''; // Reset input
+  };
+
+  const clearCustomImage = (type: 'SIDEBAR' | 'MAIN') => {
+      if (type === 'SIDEBAR') {
+          setCustomSidebarImage(null);
+          localStorage.removeItem('cloudops_custom_sidebar_bg');
+      } else {
+          setCustomMainImage(null);
+          localStorage.removeItem('cloudops_custom_main_bg');
+      }
+  };
+
+  // Construct Final Styles combining Theme + Custom Images
+  const finalSidebarStyle: React.CSSProperties = {
+      ...currentTheme.sidebarStyle,
+      ...(customSidebarImage ? {
+          backgroundImage: `url(${customSidebarImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundColor: '#000', // Fallback
+          backgroundBlendMode: 'overlay', // Blend with currentTheme background or simple overlay
+      } : {})
+  };
+
+  // For readability, if custom image is present on sidebar, force text to white and add overlay
+  const finalSidebarTextColor = customSidebarImage ? 'text-white shadow-sm' : currentTheme.sidebarTextColor;
+  
+  const finalMainStyle: React.CSSProperties = {
+      ...currentTheme.mainStyle,
+      ...(customMainImage ? {
+          backgroundImage: `url(${customMainImage})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed' // Parallax feel
+      } : {})
+  };
+
 
   // Layout Components
   const SidebarItem: React.FC<{ view: ViewMode; icon: React.ReactNode; label: string }> = ({ view, icon, label }) => {
     const isSelected = currentView === view;
-    // Calculate dynamic hover/active styles based on theme brightness could be complex, 
-    // so we use semi-transparent white/black overlays.
     return (
       <button
         onClick={() => setCurrentView(view)}
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 
           ${isSelected 
             ? 'bg-white/20 shadow-sm text-white font-bold backdrop-blur-sm' 
-            : `${currentTheme.sidebarTextColor} hover:bg-white/10 hover:text-white`
+            : `${finalSidebarTextColor} hover:bg-white/10 hover:text-white`
           }`}
       >
         {icon}
@@ -291,10 +362,15 @@ const App: React.FC = () => {
     <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
       {/* Sidebar */}
       <aside 
-        className="w-64 flex flex-col shadow-xl z-20 transition-all duration-500 ease-in-out"
-        style={currentTheme.sidebarStyle}
+        className="w-64 flex flex-col shadow-xl z-20 transition-all duration-500 ease-in-out relative"
+        style={finalSidebarStyle}
       >
-        <div className="p-6 flex items-center gap-3 border-b border-white/10">
+        {/* Dark overlay for readability if custom image exists */}
+        {customSidebarImage && (
+            <div className="absolute inset-0 bg-black/40 pointer-events-none z-0"></div>
+        )}
+
+        <div className="p-6 flex items-center gap-3 border-b border-white/10 relative z-10">
           <div className="p-2 bg-white/20 backdrop-blur-md rounded-lg shadow-sm">
             <Cloud size={24} className="text-white" />
           </div>
@@ -304,7 +380,7 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2 mt-4">
+        <nav className="flex-1 p-4 space-y-2 mt-4 relative z-10">
           <SidebarItem view="DASHBOARD" icon={<LayoutDashboard size={20} />} label="대시보드" />
           <SidebarItem view="TASKS" icon={<ListTodo size={20} />} label="업무 관리" />
           <SidebarItem view="SCHEDULE" icon={<CalendarIcon size={20} />} label="일정" />
@@ -314,10 +390,10 @@ const App: React.FC = () => {
           <SidebarItem view="AI_CHAT" icon={<Bot size={20} />} label="AI 어시스턴트" />
         </nav>
 
-        <div className="p-4 border-t border-white/10 space-y-2">
+        <div className="p-4 border-t border-white/10 space-y-2 relative z-10">
           <button 
             onClick={handleLogout}
-            className={`flex items-center gap-2 transition-colors w-full px-4 py-2 ${currentTheme.sidebarTextColor} hover:text-white hover:bg-white/10 rounded-lg`}
+            className={`flex items-center gap-2 transition-colors w-full px-4 py-2 ${finalSidebarTextColor} hover:text-white hover:bg-white/10 rounded-lg`}
           >
             <LogOut size={18} />
             <span className="text-sm">로그아웃</span>
@@ -328,7 +404,7 @@ const App: React.FC = () => {
       {/* Main Content */}
       <main 
         className="flex-1 flex flex-col min-w-0 overflow-hidden relative transition-all duration-500"
-        style={currentTheme.mainStyle}
+        style={finalMainStyle}
       >
         
         {/* Floating Restore Button (Visible when header is hidden) */}
@@ -362,32 +438,83 @@ const App: React.FC = () => {
                  <button 
                     onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
                     className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2"
-                    title="테마 변경"
+                    title="테마 및 배경 설정"
                  >
                      <Palette size={20} />
                  </button>
 
                  {isThemeMenuOpen && (
-                     <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-fade-in-up">
+                     <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-fade-in-up">
+                         {/* Default Themes */}
                          <div className="px-4 py-2 border-b border-gray-50 mb-1">
-                             <span className="text-xs font-bold text-gray-500">테마 선택</span>
+                             <span className="text-xs font-bold text-gray-500 uppercase">기본 테마 선택</span>
                          </div>
-                         {THEMES.map(theme => (
-                             <button
-                                key={theme.id}
-                                onClick={() => changeTheme(theme)}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between group"
-                             >
-                                <div className="flex items-center gap-2">
-                                    <div 
-                                        className="w-4 h-4 rounded-full border border-gray-200"
-                                        style={{ background: theme.sidebarStyle.background || theme.sidebarStyle.backgroundColor }}
-                                    ></div>
-                                    {theme.name}
-                                </div>
-                                {currentTheme.id === theme.id && <Check size={14} className="text-blue-600" />}
-                             </button>
-                         ))}
+                         <div className="max-h-48 overflow-y-auto scrollbar-thin">
+                             {THEMES.map(theme => (
+                                 <button
+                                    key={theme.id}
+                                    onClick={() => changeTheme(theme)}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between group"
+                                 >
+                                    <div className="flex items-center gap-2">
+                                        <div 
+                                            className="w-4 h-4 rounded-full border border-gray-200"
+                                            style={{ background: theme.sidebarStyle.background || theme.sidebarStyle.backgroundColor }}
+                                        ></div>
+                                        {theme.name}
+                                    </div>
+                                    {currentTheme.id === theme.id && <Check size={14} className="text-blue-600" />}
+                                 </button>
+                             ))}
+                         </div>
+
+                         {/* Custom Backgrounds */}
+                         <div className="px-4 py-2 border-t border-b border-gray-50 my-1 bg-gray-50/50">
+                             <span className="text-xs font-bold text-gray-500 uppercase">커스텀 배경 설정</span>
+                         </div>
+                         <div className="p-3 space-y-3">
+                             {/* Sidebar Custom */}
+                             <div>
+                                 <div className="flex justify-between items-center mb-1">
+                                     <span className="text-xs text-gray-600 flex items-center gap-1"><ImageIcon size={12}/> 사이드바 배경</span>
+                                     {customSidebarImage && (
+                                         <button onClick={() => clearCustomImage('SIDEBAR')} className="text-red-500 text-[10px] hover:underline flex items-center">
+                                             <X size={10} /> 삭제
+                                         </button>
+                                     )}
+                                 </div>
+                                 <div className="flex items-center gap-2">
+                                     <button 
+                                        onClick={() => sidebarFileRef.current?.click()}
+                                        className="flex-1 border border-dashed border-gray-300 rounded-md p-1.5 text-xs text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-colors text-center"
+                                     >
+                                         {customSidebarImage ? '이미지 변경' : '이미지 업로드'}
+                                     </button>
+                                     <input type="file" ref={sidebarFileRef} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'SIDEBAR')} />
+                                 </div>
+                             </div>
+
+                             {/* Main Content Custom */}
+                             <div>
+                                 <div className="flex justify-between items-center mb-1">
+                                     <span className="text-xs text-gray-600 flex items-center gap-1"><ImageIcon size={12}/> 메인 화면 배경</span>
+                                     {customMainImage && (
+                                         <button onClick={() => clearCustomImage('MAIN')} className="text-red-500 text-[10px] hover:underline flex items-center">
+                                             <X size={10} /> 삭제
+                                         </button>
+                                     )}
+                                 </div>
+                                 <div className="flex items-center gap-2">
+                                     <button 
+                                        onClick={() => mainFileRef.current?.click()}
+                                        className="flex-1 border border-dashed border-gray-300 rounded-md p-1.5 text-xs text-gray-500 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-600 transition-colors text-center"
+                                     >
+                                         {customMainImage ? '이미지 변경' : '이미지 업로드'}
+                                     </button>
+                                     <input type="file" ref={mainFileRef} className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'MAIN')} />
+                                 </div>
+                             </div>
+                         </div>
                      </div>
                  )}
               </div>
@@ -424,7 +551,7 @@ const App: React.FC = () => {
         )}
 
         {/* View Content */}
-        <div className="flex-1 overflow-auto p-2 sm:p-4 scrollbar-thin scrollbar-thumb-gray-300">
+        <div className={`flex-1 overflow-auto p-2 sm:p-4 scrollbar-thin scrollbar-thumb-gray-300 ${customMainImage ? 'bg-white/80 backdrop-blur-sm rounded-tl-2xl mt-2 ml-2 shadow-inner' : ''}`}>
           {currentView === 'DASHBOARD' && <Dashboard tasks={tasks} />}
           {currentView === 'TASKS' && <TaskBoard tasks={tasks} setTasks={setTasks} />}
           {currentView === 'AI_CHAT' && <GeminiChat tasks={tasks} knowledgeItems={knowledgeItems} />}
