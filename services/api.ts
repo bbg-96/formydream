@@ -1,13 +1,11 @@
 import { User, Task, KnowledgeItem, Email, Memo } from '../types';
 
 // =================================================================
-// [설정 확인] 사용자의 VM IP 주소
+// [배포 설정] Nginx Reverse Proxy를 사용하므로 상대 경로로 변경
 // =================================================================
-const VM_IP = '10.200.0.160'; 
-
-const API_BASE_URL = `http://${VM_IP}:3001/api`;
-// 별도로 실행되는 메일 서버 포트(3002)
-const MAIL_API_BASE_URL = `http://${VM_IP}:3002/api/mail`;
+const API_BASE_URL = '/api';
+// 메일 서버도 동일하게 프록시 처리 (Nginx 설정에서 분기)
+const MAIL_API_BASE_URL = '/api/mail';
 
 // Helper to handle response
 const handleResponse = async (response: Response) => {
@@ -165,7 +163,7 @@ export const api = {
   mail: {
     connect: async (userId: string | number, config: any): Promise<boolean> => {
       try {
-        // Points to Port 3002
+        // Points to /api/mail/connect
         const response = await fetch(`${MAIL_API_BASE_URL}/connect`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -180,7 +178,7 @@ export const api = {
     },
     getMessages: async (userId: string | number, config: any, lastUid?: string | number): Promise<{ emails: Email[], latestUid: string | number }> => {
       try {
-        // Points to Port 3002
+        // Points to /api/mail/messages
         const response = await fetch(`${MAIL_API_BASE_URL}/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
