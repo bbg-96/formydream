@@ -36,6 +36,12 @@ export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems })
     scrollToBottom();
   }, [messages]);
 
+  // Helper to strip HTML tags for cleaner context
+  const stripHtml = (html: string) => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || "";
+  };
+
   const handleSend = async () => {
     if (!input.trim()) return;
 
@@ -56,10 +62,11 @@ export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems })
         : "Current Tasks: None";
 
     // Prepare context from Knowledge Base
-    // We only send metadata (Title, Category, Tags) to save tokens and avoid clutter, 
-    // unless the content is very short.
+    // Now including content (stripped of HTML) so AI can answer specific questions
     const knowledgeContext = knowledgeItems.length > 0
-        ? "Knowledge Base Items:\n" + knowledgeItems.map(k => `- [${k.category}] ${k.title} (Tags: ${k.tags.join(', ')})`).join('\n')
+        ? "Knowledge Base Items:\n" + knowledgeItems.map(k => 
+            `Title: [${k.category}] ${k.title}\nTags: ${k.tags.join(', ')}\nContent: ${stripHtml(k.content)}\n---`
+          ).join('\n')
         : "Knowledge Base Items: None";
 
     const fullContext = `${taskContext}\n\n${knowledgeContext}`;
