@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Cloud, Lock, Mail, User as UserIcon, ArrowRight, Loader2 } from 'lucide-react';
 import { User } from '../types';
+import { api } from '../services/api';
 
 interface AuthProps {
   onLogin: (user: User) => void;
@@ -21,26 +22,19 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     setError('');
     setLoading(true);
 
-    // Simulation of API Call
-    setTimeout(() => {
-      setLoading(false);
-      
-      if (email && password) {
-        // Mock Success
-        const mockUser: User = {
-          id: 'u-123',
-          email: email,
-          name: name || email.split('@')[0],
-          role: 'Engineer'
-        };
-        
-        // In a real app, you would send credentials to your backend (VMware DB) here
-        // and receive a JWT token.
-        onLogin(mockUser);
-      } else {
-        setError('이메일과 비밀번호를 입력해주세요.');
-      }
-    }, 1500);
+    try {
+        let user: User;
+        if (isLogin) {
+            user = await api.auth.login(email, password);
+        } else {
+            user = await api.auth.signup(name, email, password);
+        }
+        onLogin(user);
+    } catch (err: any) {
+        setError(err.message || '로그인/회원가입 중 오류가 발생했습니다.');
+    } finally {
+        setLoading(false);
+    }
   };
 
   return (

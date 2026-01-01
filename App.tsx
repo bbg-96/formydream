@@ -7,6 +7,7 @@ import { GeminiChat } from './components/GeminiChat';
 import { Schedule } from './components/Schedule';
 import { KnowledgeBase } from './components/KnowledgeBase';
 import { Auth } from './components/Auth';
+import { api } from './services/api';
 
 // Helper to get today's date in YYYY-MM-DD format
 const getToday = () => new Date().toISOString().split('T')[0];
@@ -16,8 +17,8 @@ const getFutureDate = (days: number) => {
   return d.toISOString().split('T')[0];
 };
 
-// Mock Data for Tasks
-const INITIAL_TASKS: Task[] = [
+// Fallback Mock Data for Tasks (Used if API connection fails)
+const FALLBACK_TASKS: Task[] = [
   {
     id: 't1',
     title: 'EKS 클러스터 버전 업그레이드',
@@ -64,8 +65,8 @@ const INITIAL_TASKS: Task[] = [
   }
 ];
 
-// Mock Data for Knowledge Base
-const INITIAL_KNOWLEDGE: KnowledgeItem[] = [
+// Fallback Mock Data for Knowledge Base
+const FALLBACK_KNOWLEDGE: KnowledgeItem[] = [
   {
     id: 'k1',
     title: 'S3 Bucket Policy 예제 (CloudFront OAC)',
@@ -87,26 +88,48 @@ const INITIAL_KNOWLEDGE: KnowledgeItem[] = [
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<ViewMode>('DASHBOARD');
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
-  const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>(INITIAL_KNOWLEDGE);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
 
   useEffect(() => {
     // Check local storage for existing session
     const savedUser = localStorage.getItem('cloudops_user');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      const parsedUser = JSON.parse(savedUser);
+      setUser(parsedUser);
+      loadData(parsedUser.id);
     }
   }, []);
+
+  const loadData = async (userId: string) => {
+    try {
+      const fetchedTasks = await api.tasks.getAll(userId);
+      setTasks(fetchedTasks);
+    } catch (e) {
+      // If API fails (e.g. backend not running), use fallback
+      setTasks(FALLBACK_TASKS);
+    }
+
+    try {
+       const fetchedKnowledge = await api.knowledge.getAll(userId);
+       setKnowledgeItems(fetchedKnowledge);
+    } catch (e) {
+       setKnowledgeItems(FALLBACK_KNOWLEDGE);
+    }
+  };
 
   const handleLogin = (loggedInUser: User) => {
     setUser(loggedInUser);
     localStorage.setItem('cloudops_user', JSON.stringify(loggedInUser));
+    loadData(loggedInUser.id);
   };
 
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('cloudops_user');
     setCurrentView('DASHBOARD');
+    setTasks([]);
+    setKnowledgeItems([]);
   };
 
   // Layout Components
