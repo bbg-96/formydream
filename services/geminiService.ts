@@ -79,11 +79,14 @@ export const chatWithAssistant = async (message: string, context: string): Promi
 
         const model = "gemini-3-flash-preview";
         const prompt = `
-        Context regarding current tasks: ${context}
+        System Context (Tasks, Knowledge Base, etc.):
+        ${context}
         
         User Query: ${message}
         
-        You are a CloudOps assistant. Answer the user's query. If they ask about the context, refer to it. Keep answers concise and technical.
+        You are a CloudOps assistant. Answer the user's query based on the provided context. 
+        If the user asks what is in the knowledge base or tasks, list them from the context.
+        Keep answers concise and technical.
         `;
 
         const response = await ai.models.generateContent({

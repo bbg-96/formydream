@@ -265,7 +265,7 @@ const App: React.FC = () => {
         <div className="flex-1 overflow-auto bg-gray-50/50 p-2 sm:p-4">
           {currentView === 'DASHBOARD' && <Dashboard tasks={tasks} />}
           {currentView === 'TASKS' && <TaskBoard tasks={tasks} setTasks={setTasks} />}
-          {currentView === 'AI_CHAT' && <GeminiChat tasks={tasks} />}
+          {currentView === 'AI_CHAT' && <GeminiChat tasks={tasks} knowledgeItems={knowledgeItems} />}
           {currentView === 'SCHEDULE' && <Schedule tasks={tasks} />}
           {currentView === 'MEMO' && <MemoBoard userId={user.id} />}
           {/* {currentView === 'MAIL' && (

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Loader2 } from 'lucide-react';
 import { chatWithAssistant } from '../services/geminiService';
-import { Task } from '../types';
+import { Task, KnowledgeItem } from '../types';
 
 interface Message {
   id: string;
@@ -12,14 +12,15 @@ interface Message {
 
 interface GeminiChatProps {
   tasks: Task[];
+  knowledgeItems: KnowledgeItem[];
 }
 
-export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks }) => {
+export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems }) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content: '안녕하세요! 클라우드 운영 관련 질문이나 업무 지원이 필요하시면 말씀해주세요. 현재 등록된 태스크 정보도 알고 있습니다.',
+      content: '안녕하세요! 클라우드 운영 관련 질문이나 업무 지원이 필요하시면 말씀해주세요. 현재 등록된 업무 및 지식 저장소 정보를 기반으로 답변해드립니다.',
       timestamp: new Date(),
     }
   ]);
@@ -49,10 +50,21 @@ export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks }) => {
     setInput('');
     setIsLoading(true);
 
-    // Prepare context from tasks
-    const context = tasks.map(t => `- [${t.status}] ${t.title} (${t.priority})`).join('\n');
+    // Prepare context from Tasks
+    const taskContext = tasks.length > 0 
+        ? "Current Tasks:\n" + tasks.map(t => `- [${t.status}] ${t.title} (Priority: ${t.priority})`).join('\n')
+        : "Current Tasks: None";
+
+    // Prepare context from Knowledge Base
+    // We only send metadata (Title, Category, Tags) to save tokens and avoid clutter, 
+    // unless the content is very short.
+    const knowledgeContext = knowledgeItems.length > 0
+        ? "Knowledge Base Items:\n" + knowledgeItems.map(k => `- [${k.category}] ${k.title} (Tags: ${k.tags.join(', ')})`).join('\n')
+        : "Knowledge Base Items: None";
+
+    const fullContext = `${taskContext}\n\n${knowledgeContext}`;
     
-    const responseText = await chatWithAssistant(userMsg.content, context);
+    const responseText = await chatWithAssistant(userMsg.content, fullContext);
 
     const aiMsg: Message = {
       id: (Date.now() + 1).toString(),
