@@ -26,7 +26,7 @@ pool.connect(async (err, client, release) => {
   } else {
     console.log('>>> Database Connected Successfully to 10.200.0.159');
     
-    // Auto-create memos table if not exists (Updated with x, y, width, height)
+    // Auto-create memos table if not exists (For fresh setup only)
     try {
         await client.query(`
             CREATE TABLE IF NOT EXISTS memos (
@@ -41,15 +41,6 @@ pool.connect(async (err, client, release) => {
                 created_at TIMESTAMP
             )
         `);
-        
-        // Add columns if they don't exist (Migration for existing tables)
-        try {
-            await client.query(`ALTER TABLE memos ADD COLUMN IF NOT EXISTS width INTEGER DEFAULT 280`);
-            await client.query(`ALTER TABLE memos ADD COLUMN IF NOT EXISTS height INTEGER DEFAULT 280`);
-        } catch (alterErr) {
-            console.log('Columns already exist or alter failed');
-        }
-
         console.log('>>> Memos Table Ready');
     } catch(tableErr) {
         console.error('Failed to create memos table', tableErr);

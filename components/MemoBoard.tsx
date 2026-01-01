@@ -74,6 +74,7 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
   const MemoCard: React.FC<{ memo: Memo }> = ({ memo }) => {
       const [localContent, setLocalContent] = useState(memo.content);
       const [isFocused, setIsFocused] = useState(false);
+      const [isResizing, setIsResizing] = useState(false);
       const memoRef = useRef<HTMLDivElement>(null);
 
       useEffect(() => {
@@ -91,6 +92,7 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
       const handleResizeStart = (e: React.MouseEvent) => {
         e.preventDefault();
         e.stopPropagation();
+        setIsResizing(true);
 
         const startX = e.clientX;
         const startY = e.clientY;
@@ -111,6 +113,7 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
         const handleMouseUp = (upEvent: MouseEvent) => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
+            setIsResizing(false);
             
             const newWidth = Math.max(200, startWidth + (upEvent.clientX - startX));
             const newHeight = Math.max(200, startHeight + (upEvent.clientY - startY));
@@ -129,7 +132,7 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
                 width: memo.width || 280, 
                 height: memo.height || 280 
             }}
-            className={`relative p-5 rounded-lg shadow-md border ${COLORS[memo.color as keyof typeof COLORS]} flex flex-col transition-shadow hover:shadow-xl animate-fade-in group shrink-0`}
+            className={`relative p-5 rounded-lg shadow-md border ${COLORS[memo.color as keyof typeof COLORS]} flex flex-col transition-shadow hover:shadow-xl animate-fade-in group shrink-0 ${isResizing ? 'select-none cursor-se-resize' : ''}`}
         >
             {/* Color Picker & Delete */}
             <div className="flex justify-between items-start mb-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2 left-4 z-10">
@@ -155,7 +158,7 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
                 onChange={(e) => setLocalContent(e.target.value)}
                 onFocus={() => setIsFocused(true)}
                 onBlur={handleBlur}
-                className="w-full h-full bg-transparent resize-none outline-none text-gray-800 placeholder:text-gray-500/50 mt-4 leading-relaxed font-medium"
+                className={`w-full h-full bg-transparent resize-none outline-none text-gray-800 placeholder:text-gray-500/50 mt-4 leading-relaxed font-medium ${isResizing ? 'pointer-events-none' : ''}`}
                 placeholder="내용을 입력하세요..."
             />
             
@@ -165,10 +168,10 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
                 {!isFocused && localContent === memo.content && <span className="text-green-600 flex items-center gap-1"><Check size={10}/> Saved</span>}
             </div>
 
-            {/* Resize Handle */}
+            {/* Resize Handle - Larger click area */}
             <div 
                 onMouseDown={handleResizeStart}
-                className="absolute bottom-1 right-1 p-2 cursor-se-resize text-gray-400 hover:text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                className="absolute bottom-0 right-0 w-8 h-8 flex items-end justify-end p-1.5 cursor-se-resize text-gray-400 hover:text-gray-600 z-20 hover:bg-black/5 rounded-tl-xl transition-colors"
                 title="크기 조절"
             >
                 <GripHorizontal size={16} className="-rotate-45" />
