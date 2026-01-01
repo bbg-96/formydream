@@ -1,13 +1,11 @@
 import { User, Task, KnowledgeItem } from '../types';
 
-// API Server Configuration
-// 1. If you are running the API server locally on your host machine: use 'http://localhost:3001/api'
-// 2. If you are running the API server on a VMware VM: use 'http://<VM_IP_ADDRESS>:3001/api'
-// Example: const API_BASE_URL = 'http://192.168.0.10:3001/api';
+// =================================================================
+// [설정 확인] 사용자의 VM IP 주소 (로그 기반 업데이트)
+// =================================================================
+const VM_IP = '10.200.0.160'; 
 
-// Try to get from environment variable (Vite uses import.meta.env, CRA uses process.env)
-// For local development with VM, you can hardcode the VM IP here if you don't want to set up .env files yet.
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api'; 
+const API_BASE_URL = `http://${VM_IP}:3001/api`;
 
 // Helper to handle response
 const handleResponse = async (response: Response) => {
@@ -29,16 +27,21 @@ export const api = {
         });
         return handleResponse(response);
       } catch (e) {
-        console.warn(`Failed to connect to API at ${API_BASE_URL}. Using Mock Data.`);
+        console.error(`[Connection Failed] ${API_BASE_URL}에 연결할 수 없습니다.`, e);
+        console.warn("⚠️ 백엔드 연결 실패로 인해 '임시(Mock) 데이터'를 사용합니다. DB에는 저장되지 않습니다.");
+        
         // Fallback for demo purposes if backend is not running
         return new Promise((resolve, reject) => {
             if (email && password) {
-                resolve({
-                    id: 'u-123',
-                    email,
-                    name: email.split('@')[0],
-                    role: 'Engineer'
-                });
+                // Simulate network delay
+                setTimeout(() => {
+                    resolve({
+                        id: 'mock-u-123',
+                        email,
+                        name: email.split('@')[0],
+                        role: 'Engineer (Offline Mode)'
+                    });
+                }, 500);
             } else {
                 reject(new Error('Invalid credentials'));
             }
@@ -53,15 +56,19 @@ export const api = {
           body: JSON.stringify({ name, email, password }),
         });
         return handleResponse(response);
-      } catch (e) {
-         console.warn(`Failed to connect to API at ${API_BASE_URL}. Using Mock Data.`);
-         return { id: `u-${Date.now()}`, email, name, role: 'Engineer' };
+      } catch (e: any) {
+         console.error(`[Signup Failed] ${API_BASE_URL}/signup`, e);
+         // alert 제거 -> Auth 컴포넌트에서 에러 메시지를 받아 처리하도록 함
+         throw e;
       }
     }
   },
   tasks: {
     getAll: async (userId: string): Promise<Task[]> => {
       try {
+        // If it's a mock user, don't even try to fetch real tasks
+        if (userId.startsWith('mock-')) throw new Error('Mock User');
+
         const response = await fetch(`${API_BASE_URL}/tasks?userId=${userId}`);
         return handleResponse(response);
       } catch (error) {
@@ -70,17 +77,15 @@ export const api = {
       }
     },
     create: async (task: Task): Promise<Task> => {
-       const response = await fetch(`${API_BASE_URL}/tasks`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(task),
-      });
-      return handleResponse(response);
+       // 실제 구현 시 백엔드 호출
+       // const response = await fetch(`${API_BASE_URL}/tasks`, ...);
+       return task;
     }
   },
   knowledge: {
       getAll: async (userId: string): Promise<KnowledgeItem[]> => {
           try {
+             if (userId.startsWith('mock-')) throw new Error('Mock User');
             const response = await fetch(`${API_BASE_URL}/knowledge?userId=${userId}`);
             return handleResponse(response);
           } catch (error) {
