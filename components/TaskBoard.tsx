@@ -25,7 +25,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
   };
 
   const handleDelete = (taskId: string) => {
-    setTasks(prev => prev.filter(t => t.id !== taskId));
+    if (window.confirm('정말 이 작업을 삭제하시겠습니까? 삭제된 작업은 복구할 수 없습니다.')) {
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+    }
   };
 
   const handleAiBreakdown = async () => {
