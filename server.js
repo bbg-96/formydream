@@ -1,46 +1,171 @@
 const express = require('express');
+const { Pool } = require('pg');
 const cors = require('cors');
-const bodyParser = require('body-parser');
+const bcrypt = require('bcrypt');
 const imaps = require('imap-simple');
 const Pop3Command = require('node-pop3');
 const simpleParser = require('mailparser').simpleParser;
 
 const app = express();
-const PORT = 3001;
 
 app.use(cors());
-app.use(bodyParser.json());
+app.use(express.json());
 
-// In-memory Mock DB (재시작 시 초기화됨)
-let users = [{ id: 'u1', email: 'engineer@cloudops.com', password: 'password', name: 'Kim Engineer', role: 'Cloud Engineer' }];
-let tasks = [];
-let knowledgeBase = [];
-
-// --- Auth Routes ---
-app.post('/api/login', (req, res) => {
-  const { email, password } = req.body;
-  const user = users.find(u => u.email === email && u.password === password);
-  if (user) res.json(user);
-  else res.status(401).json({ message: 'Invalid credentials' });
+const pool = new Pool({
+  user: 'postgres',
+  host: '10.200.0.159', 
+  database: 'cloudops_db',
+  password: '03474506', // [비밀번호 확인]
+  port: 5432,
 });
 
-app.post('/api/signup', (req, res) => {
+// --- Auth ---
+app.post('/api/signup', async (req, res) => {
   const { name, email, password } = req.body;
-  const newUser = { id: `u${Date.now()}`, name, email, password, role: 'Engineer' };
-  users.push(newUser);
-  res.json(newUser);
+  try {
+    const check = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (check.rows.length > 0) return res.status(400).json({ message: "User exists" });
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role',
+      [name, email, hashedPassword, 'Cloud Engineer']
+    );
+    res.json(result.rows[0]);
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// ==========================================
-// [Mail Integration Routes]
-// 이 부분을 API 서버의 server.js에 추가하세요.
-// ==========================================
+app.post('/api/login', async (req, res) => {
+  const { email, password } = req.body;
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (result.rows.length === 0) return res.status(401).json({ message: "Invalid credentials" });
+    const user = result.rows[0];
+    if (await bcrypt.compare(password, user.password)) {
+      const { password, ...userWithoutPassword } = user;
+      res.json(userWithoutPassword);
+    } else {
+      res.status(401).json({ message: "Invalid credentials" });
+    }
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
-// 1. Mail Connection Check (연동 테스트)
+// --- Tasks ---
+app.get('/api/tasks', async (req, res) => {
+  const { userId } = req.query;
+  try {
+    const result = await pool.query('SELECT * FROM tasks WHERE user_id = $1', [userId]);
+    const formatted = result.rows.map(row => ({
+        id: row.id,
+        title: row.title,
+        description: row.description,
+        status: row.status,
+        priority: row.priority,
+        dueDate: row.due_date,
+        tags: row.tags,
+        subTasks: row.sub_tasks || [],
+        createdAt: row.created_at
+    }));
+    res.json(formatted);
+  } catch (err) { console.error(err); res.json([]); }
+});
+
+app.post('/api/tasks', async (req, res) => {
+    const { id, userId, title, description, status, priority, dueDate, tags, subTasks, createdAt } = req.body;
+    try {
+        await pool.query(
+            `INSERT INTO tasks (id, user_id, title, description, status, priority, due_date, tags, sub_tasks, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+             ON CONFLICT (id) DO UPDATE SET
+               title=$3, description=$4, status=$5, priority=$6, due_date=$7, tags=$8, sub_tasks=$9`,
+            [id, userId, title, description, status, priority, dueDate, tags, JSON.stringify(subTasks), createdAt]
+        );
+        res.json({ success: true });
+    } catch(err) { console.error(err); res.status(500).json({error: err.message}); }
+});
+
+app.delete('/api/tasks/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM tasks WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+// --- Knowledge ---
+app.get('/api/knowledge', async (req, res) => {
+    const { userId } = req.query;
+    try {
+        const result = await pool.query('SELECT * FROM knowledge WHERE user_id = $1', [userId]);
+        const formatted = result.rows.map(row => ({
+            id: row.id,
+            title: row.title,
+            content: row.content,
+            category: row.category,
+            tags: row.tags,
+            isDraft: row.is_draft,
+            createdAt: row.created_at
+        }));
+        res.json(formatted);
+    } catch (err) { console.error(err); res.json([]); }
+});
+
+app.post('/api/knowledge', async (req, res) => {
+    const { id, userId, title, content, category, tags, isDraft, createdAt } = req.body;
+    try {
+        await pool.query(
+            `INSERT INTO knowledge (id, user_id, title, content, category, tags, is_draft, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             ON CONFLICT (id) DO UPDATE SET
+               title=$3, content=$4, category=$5, tags=$6, is_draft=$7`,
+            [id, userId, title, content, category, tags, isDraft, createdAt]
+        );
+        res.json({ success: true });
+    } catch(err) { console.error(err); res.status(500).json({error: err.message}); }
+});
+
+app.delete('/api/knowledge/:id', async (req, res) => {
+    try {
+        await pool.query('DELETE FROM knowledge WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+app.put('/api/knowledge/:id', async (req, res) => {
+    // knowledge update logic same as post/upsert usually, but for clarity:
+    const { id } = req.params;
+    const { userId, title, content, category, tags, isDraft } = req.body;
+    try {
+        await pool.query(
+             `UPDATE knowledge SET title=$1, content=$2, category=$3, tags=$4, is_draft=$5 WHERE id=$6`,
+             [title, content, category, tags, isDraft, id]
+        );
+        res.json({ success: true });
+    } catch(err) { res.status(500).json({error: err.message}); }
+});
+
+// --- User Settings ---
+app.put('/api/users/:id/password', async (req, res) => {
+  const { id } = req.params;
+  const { password } = req.body; 
+  if (!password) return res.status(400).json({ message: "Password is required" });
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    await pool.query('UPDATE users SET password = $1 WHERE id = $2', [hashedPassword, id]);
+    res.json({ success: true, message: "Password updated successfully" });
+  } catch (err) {
+    console.error('Password Update Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =================================================================
+// [Mail Integration]
+// =================================================================
+
+// 1. Connection Check
 app.post('/api/mail/connect', async (req, res) => {
-  console.log(`[Mail Connect Request] Protocol: ${req.body.protocol}, User: ${req.body.email}`);
   const { protocol, host, port, email, password, useSSL } = req.body;
-  
+  console.log(`[Mail] Connecting to ${host}:${port} (${protocol}) for ${email}`);
+
   try {
     if (protocol === 'IMAP') {
       const config = {
@@ -51,14 +176,12 @@ app.post('/api/mail/connect', async (req, res) => {
           port: parseInt(port),
           tls: useSSL,
           authTimeout: 5000,
-          tlsOptions: { rejectUnauthorized: false } // 사설 인증서 허용
+          tlsOptions: { rejectUnauthorized: false }
         }
       };
-      
       const connection = await imaps.connect(config);
       await connection.end();
       res.json({ success: true });
-      
     } else if (protocol === 'POP3') {
       const pop3 = new Pop3Command({
         user: email,
@@ -69,26 +192,24 @@ app.post('/api/mail/connect', async (req, res) => {
         timeout: 5000,
         tlsOptions: { rejectUnauthorized: false }
       });
-
-      await pop3.UIDL(); // 간단한 명령어로 연결 확인
+      await pop3.UIDL();
       await pop3.QUIT();
       res.json({ success: true });
     } else {
       res.status(400).json({ message: 'Unsupported protocol' });
     }
   } catch (error) {
-    console.error('Mail Connection Error:', error.message);
+    console.error('Mail Connect Error:', error.message);
     res.status(500).json({ message: 'Connection failed', error: error.message });
   }
 });
 
-// 2. Fetch Messages (메일 목록 가져오기)
+// 2. Fetch Messages
+// NOTE: We do not store passwords in DB. The client must send credentials with every fetch request.
 app.post('/api/mail/messages', async (req, res) => {
-  console.log(`[Mail Fetch Request] User: ${req.body.userId}`);
   const { config } = req.body;
-  
   if (!config || !config.password) {
-      return res.status(400).json({ message: 'Mail configuration missing' });
+      return res.status(400).json({ message: 'Mail credentials missing' });
   }
 
   const { protocol, host, port, email, password, useSSL } = config;
@@ -119,7 +240,7 @@ app.post('/api/mail/messages', async (req, res) => {
         struct: true
       };
       
-      // 최근 10개만 조회
+      // Fetch only last 10 messages for performance
       const messages = await connection.search(searchCriteria, fetchOptions);
       const recentMessages = messages.slice(-10).reverse();
 
@@ -128,7 +249,6 @@ app.post('/api/mail/messages', async (req, res) => {
         const id = item.attributes.uid;
         const idHeader = "Imap-Id: "+id + "\r\n";
         
-        // simpleParser를 사용하여 메일 파싱
         const parsed = await simpleParser(idHeader + (all.body || ""));
         
         emails.push({
@@ -141,7 +261,6 @@ app.post('/api/mail/messages', async (req, res) => {
           isRead: item.attributes.flags && item.attributes.flags.includes('\\Seen')
         });
       }
-      
       await connection.end();
 
     } else if (protocol === 'POP3') {
@@ -155,10 +274,9 @@ app.post('/api/mail/messages', async (req, res) => {
         tlsOptions: { rejectUnauthorized: false }
       });
 
-      // LIST 명령어로 메일 목록 조회
       const list = await pop3.LIST();
       const total = list.length;
-      const start = Math.max(1, total - 4); // 최근 5개 조회
+      const start = Math.max(1, total - 4); // Fetch last 5
       
       for (let i = total; i >= start; i--) {
         const raw = await pop3.RETR(i);
@@ -178,62 +296,10 @@ app.post('/api/mail/messages', async (req, res) => {
     }
 
     res.json(emails);
-
   } catch (error) {
-    console.error('Fetch Messages Error:', error);
+    console.error('Mail Fetch Error:', error.message);
     res.status(500).json({ message: 'Failed to fetch messages', error: error.message });
   }
 });
 
-// --- Other Routes (Tasks, Knowledge) ---
-app.get('/api/tasks', (req, res) => {
-  res.json(tasks.filter(t => String(t.userId) === String(req.query.userId)));
-});
-
-app.post('/api/tasks', (req, res) => {
-  tasks.push(req.body);
-  res.status(201).send();
-});
-
-app.delete('/api/tasks/:id', (req, res) => {
-  tasks = tasks.filter(t => t.id !== req.params.id);
-  res.send();
-});
-
-app.get('/api/knowledge', (req, res) => {
-  res.json(knowledgeBase.filter(k => String(k.userId) === String(req.query.userId)));
-});
-
-app.post('/api/knowledge', (req, res) => {
-  knowledgeBase.push(req.body);
-  res.status(201).send();
-});
-
-app.delete('/api/knowledge/:id', (req, res) => {
-  knowledgeBase = knowledgeBase.filter(k => k.id !== req.params.id);
-  res.send();
-});
-app.put('/api/knowledge/:id', (req, res) => {
-    const idx = knowledgeBase.findIndex(k => k.id === req.params.id);
-    if(idx >= 0) {
-        knowledgeBase[idx] = req.body;
-        res.send();
-    } else {
-        res.status(404).send();
-    }
-});
-
-// Update Password
-app.put('/api/users/:id/password', (req, res) => {
-    const user = users.find(u => String(u.id) === String(req.params.id));
-    if(user) {
-        user.password = req.body.password;
-        res.send();
-    } else {
-        res.status(404).send();
-    }
-});
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Backend Server running on port ${PORT}`);
-});
+app.listen(3001, '0.0.0.0', () => console.log('Server running on 3001'));

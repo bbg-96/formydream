@@ -31,9 +31,6 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks }) => {
   const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>(TaskPriority.MEDIUM);
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
 
-  // Auto-connect removed to ensure password is present in config
-  // The user must click "Connect" or we would need to persist encrypted password (not implemented for demo)
-
   const fetchEmails = async (configOverride?: any) => {
     // If we don't have a password in state, we can't fetch.
     const configToUse = configOverride || mailConfig;

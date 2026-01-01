@@ -145,14 +145,13 @@ export const api = {
         return false;
       }
     },
-    // Updated to accept config for password
+    // Updated: Send config (with password) via POST body to backend
     getMessages: async (userId: string | number, config: any): Promise<Email[]> => {
       try {
-        // Use POST to send config (with password) securely
         const response = await fetch(`${API_BASE_URL}/mail/messages`, {
             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({ userId, config })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, config })
         });
         return handleResponse(response);
       } catch (e) {
