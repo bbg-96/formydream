@@ -48,10 +48,20 @@ export interface KnowledgeItem {
   isDraft?: boolean;
 }
 
+export interface Email {
+  id: string;
+  senderName: string;
+  senderAddress: string;
+  subject: string;
+  body: string;
+  receivedAt: string;
+  isRead: boolean;
+}
+
 export interface AIBreakdownResponse {
   subtasks: string[];
   suggestedTags: string[];
   prioritySuggestion: string;
 }
 
-export type ViewMode = 'DASHBOARD' | 'TASKS' | 'SCHEDULE' | 'KNOWLEDGE' | 'AI_CHAT' | 'MY_PAGE';
+export type ViewMode = 'DASHBOARD' | 'TASKS' | 'SCHEDULE' | 'KNOWLEDGE' | 'AI_CHAT' | 'MY_PAGE' | 'MAIL';

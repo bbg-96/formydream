@@ -1,4 +1,4 @@
-import { User, Task, KnowledgeItem } from '../types';
+import { User, Task, KnowledgeItem, Email } from '../types';
 
 // =================================================================
 // [설정 확인] 사용자의 VM IP 주소
@@ -137,5 +137,55 @@ export const api = {
            console.error("Failed to delete knowledge", e);
         }
       }
+  },
+  mail: {
+    connect: async (userId: string | number, config: any): Promise<boolean> => {
+      try {
+        // Mock connection check for UI demo purposes if backend fails
+        try {
+            const response = await fetch(`${API_BASE_URL}/mail/connect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...config, userId }),
+            });
+            return response.ok;
+        } catch (e) {
+            console.warn("Mail backend unavailable, simulating success for demo");
+            return true; 
+        }
+      } catch (e) {
+        console.error("Failed to connect mail", e);
+        return false;
+      }
+    },
+    getMessages: async (userId: string | number): Promise<Email[]> => {
+      try {
+        const uidStr = String(userId);
+        const response = await fetch(`${API_BASE_URL}/mail/messages?userId=${uidStr}`);
+        return handleResponse(response);
+      } catch (e) {
+        // Fallback Mock Data
+        return [
+          {
+            id: 'm1',
+            senderName: 'AWS Billing',
+            senderAddress: 'no-reply-aws@amazon.com',
+            subject: '[Alert] AWS Budget Alert - Monthly Budget Exceeded',
+            body: 'Dear Customer,\n\nYou have exceeded 85% of your monthly budget for "Production-Account".\nCurrent Spend: $1,250.00\nForecast: $1,600.00\n\nPlease review your usage in Cost Explorer.',
+            receivedAt: new Date().toISOString(),
+            isRead: false
+          },
+          {
+            id: 'm2',
+            senderName: 'Jira Notification',
+            senderAddress: 'jira@company.com',
+            subject: 'New Ticket Assigned: PROD-1234 DB Connection Timeout',
+            body: 'A new high priority ticket has been assigned to you.\n\nDescription: Application servers are experiencing intermittent timeouts connecting to Primary RDS instance.\n\nPriority: High\nReporter: QA Team',
+            receivedAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+            isRead: true
+          }
+        ];
+      }
+    }
   }
 };
