@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Plus, Tag, BookOpen, X, Hash, Trash2, Image as ImageIcon, ArrowLeft, Save, List, ListOrdered, Indent, Outdent, AlertCircle, FileText } from 'lucide-react';
+import { Search, Plus, Tag, BookOpen, X, Hash, Trash2, Image as ImageIcon, ArrowLeft, Save, List, ListOrdered, Indent, Outdent, AlertCircle, FileText, Edit } from 'lucide-react';
 import { KnowledgeItem } from '../types';
 import { api } from '../services/api';
 
@@ -35,7 +35,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
   
   // Editor State
   const [isWriting, setIsWriting] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null); // To track if we are editing a draft
+  const [editingId, setEditingId] = useState<string | null>(null); // To track if we are editing a draft or existing item
   const [showExitDialog, setShowExitDialog] = useState(false);
 
   // Viewer State
@@ -70,16 +70,21 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
     }
   }, [isWriting]);
 
-  const handleStartWriting = (draft?: KnowledgeItem) => {
+  const handleStartWriting = (item?: KnowledgeItem) => {
     resetForm();
-    if (draft) {
-      setEditingId(draft.id);
-      setNewTitle(draft.title);
-      setNewContent(draft.content);
-      setNewCategory(draft.category);
-      setNewTags(draft.tags.join(', '));
+    if (item) {
+      setEditingId(item.id);
+      setNewTitle(item.title);
+      setNewContent(item.content);
+      setNewCategory(item.category);
+      setNewTags(item.tags.join(', '));
     }
     setIsWriting(true);
+  };
+
+  const handleEditStart = (item: KnowledgeItem) => {
+      setViewingItem(null);
+      handleStartWriting(item);
   };
 
   const handleCancelRequest = () => {
@@ -131,8 +136,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
       isDraft: isDraft
     };
 
+    // Determine if we are updating an existing non-draft item or creating new/updating draft
+    const isExistingPublishedItem = editingId && items.some(i => i.id === editingId && !i.isDraft);
+
     setItems(prev => {
-      // If we are editing an existing draft, replace it
+      // If we are editing an existing item (draft or published), replace it
       if (editingId) {
         return prev.map(item => item.id === editingId ? newItem : item);
       }
@@ -140,7 +148,11 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
       return [newItem, ...prev];
     });
 
-    await api.knowledge.save(getUserId(), newItem);
+    if (isExistingPublishedItem) {
+        await api.knowledge.update(getUserId(), newItem.id, newItem);
+    } else {
+        await api.knowledge.save(getUserId(), newItem);
+    }
   };
 
   const handleDeleteItem = async (id: string, e?: React.MouseEvent) => {
@@ -299,7 +311,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
                         <ArrowLeft size={24} />
                      </button>
                      <h2 className="text-lg font-bold text-gray-800">
-                        {editingId ? '지식 수정 (임시저장)' : '새 지식 작성'}
+                        {editingId ? '지식 수정' : '새 지식 작성'}
                      </h2>
                  </div>
                  <div className="flex gap-2">
@@ -571,6 +583,13 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
                    <p className="text-sm text-gray-400 mt-1">{viewingItem.createdAt}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => handleEditStart(viewingItem)}
+                    className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                    title="수정"
+                  >
+                    <Edit size={20} />
+                  </button>
                   <button 
                     onClick={(e) => {
                         if(window.confirm('삭제하시겠습니까?')) {

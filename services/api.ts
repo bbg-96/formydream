@@ -118,6 +118,18 @@ export const api = {
           console.error("Failed to save knowledge", e);
         }
       },
+      update: async (userId: string | number, itemId: string, item: KnowledgeItem): Promise<void> => {
+        try {
+          await fetch(`${API_BASE_URL}/knowledge/${itemId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...item, userId }),
+          });
+        } catch (e) {
+          console.error("Failed to update knowledge", e);
+          throw e;
+        }
+      },
       delete: async (itemId: string): Promise<void> => {
         try {
            await fetch(`${API_BASE_URL}/knowledge/${itemId}`, { method: 'DELETE' });
