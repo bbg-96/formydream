@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, RefreshCw, Plus, Calendar, CheckSquare, Search, User, Clock, AlertCircle, Inbox, Send, Loader2 } from 'lucide-react';
+import { Mail, RefreshCw, Plus, Calendar, CheckSquare, Search, User, Clock, AlertCircle, Inbox, Send, Loader2, Server, ShieldCheck } from 'lucide-react';
 import { Email, Task, TaskPriority, TaskStatus } from '../types';
 import { api } from '../services/api';
 
@@ -16,8 +16,10 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks }) => {
 
   // Connection Form State
   const [mailConfig, setMailConfig] = useState({
-    host: 'imap.company.com',
+    protocol: 'IMAP',
+    host: 'mail.company.com',
     port: '993',
+    useSSL: true,
     email: user.email,
     password: ''
   });
@@ -43,6 +45,35 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks }) => {
     const msgs = await api.mail.getMessages(user.id);
     setEmails(msgs);
     setLoading(false);
+  };
+
+  const getStandardPort = (protocol: string, useSSL: boolean) => {
+    if (protocol === 'IMAP') return useSSL ? '993' : '143';
+    if (protocol === 'POP3') return useSSL ? '995' : '110';
+    return '';
+  };
+
+  const handleProtocolChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const protocol = e.target.value;
+    const defaultHost = protocol === 'IMAP' ? 'imap.company.com' : 'pop.company.com';
+    const newPort = getStandardPort(protocol, mailConfig.useSSL);
+    
+    setMailConfig({
+        ...mailConfig,
+        protocol,
+        port: newPort,
+        host: defaultHost
+    });
+  };
+
+  const handleSSLChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const useSSL = e.target.checked;
+      const newPort = getStandardPort(mailConfig.protocol, useSSL);
+      setMailConfig({
+          ...mailConfig,
+          useSSL,
+          port: newPort
+      });
   };
 
   const handleConnect = async (e: React.FormEvent) => {
@@ -106,19 +137,63 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks }) => {
           </div>
 
           <form onSubmit={handleConnect} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">프로토콜</label>
+                    <div className="relative">
+                        <select 
+                            value={mailConfig.protocol}
+                            onChange={handleProtocolChange}
+                            className="w-full border border-gray-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-blue-500 appearance-none bg-white"
+                        >
+                            <option value="IMAP">IMAP</option>
+                            <option value="POP3">POP3</option>
+                        </select>
+                        <Server size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"/>
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">포트</label>
+                    <input 
+                        type="text" 
+                        value={mailConfig.port}
+                        onChange={e => setMailConfig({...mailConfig, port: e.target.value})}
+                        className="w-full border border-gray-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder={getStandardPort(mailConfig.protocol, mailConfig.useSSL)}
+                        required
+                    />
+                </div>
+            </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">IMAP Host</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{mailConfig.protocol} 서버 주소 (Host)</label>
               <input 
                 type="text" 
                 value={mailConfig.host}
                 onChange={e => setMailConfig({...mailConfig, host: e.target.value})}
                 className="w-full border border-gray-300 rounded-lg p-3 outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="imap.company.com"
+                placeholder={mailConfig.protocol === 'IMAP' ? 'imap.company.com' : 'pop.company.com'}
                 required
               />
             </div>
+
+            {/* SSL Toggle */}
+            <div className="flex items-center gap-2 py-1">
+                <input 
+                    type="checkbox" 
+                    id="useSSL"
+                    checked={mailConfig.useSSL} 
+                    onChange={handleSSLChange}
+                    className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                />
+                <label htmlFor="useSSL" className="text-sm text-gray-700 cursor-pointer flex items-center gap-1.5">
+                    <ShieldCheck size={14} className={mailConfig.useSSL ? 'text-green-600' : 'text-gray-400'} />
+                    SSL/TLS 보안 연결 사용
+                </label>
+            </div>
+            
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
               <input 
                 type="email" 
                 value={mailConfig.email}
@@ -128,7 +203,7 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks }) => {
               />
             </div>
              <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">비밀번호</label>
               <input 
                 type="password" 
                 value={mailConfig.password}
@@ -148,8 +223,8 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks }) => {
             </button>
           </form>
           <p className="mt-4 text-xs text-center text-gray-400">
-            * IMAP 프로토콜을 사용하여 읽기 전용으로 접근합니다.<br/>
-            * 실제 백엔드 연동이 필요합니다 (현재는 시뮬레이션 모드)
+             * 사내 메일 서버 정책에 따라 포트(110, 995 등)를 확인해주세요.<br/>
+             * 실제 백엔드 연동이 필요합니다 (현재는 시뮬레이션 모드)
           </p>
         </div>
       </div>
@@ -165,7 +240,7 @@ export const MailClient: React.FC<MailClientProps> = ({ user, setTasks }) => {
         <div className="p-4 border-b border-gray-100 flex justify-between items-center">
           <h3 className="font-bold text-gray-800 flex items-center gap-2">
             <Inbox size={20} className="text-blue-600" />
-            받은 편지함
+            받은 편지함 ({mailConfig.protocol})
           </h3>
           <button 
             onClick={fetchEmails} 
