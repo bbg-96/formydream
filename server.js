@@ -130,7 +130,6 @@ app.delete('/api/knowledge/:id', async (req, res) => {
 });
 
 app.put('/api/knowledge/:id', async (req, res) => {
-    // knowledge update logic same as post/upsert usually, but for clarity:
     const { id } = req.params;
     const { userId, title, content, category, tags, isDraft } = req.body;
     try {
@@ -205,7 +204,6 @@ app.post('/api/mail/connect', async (req, res) => {
 });
 
 // 2. Fetch Messages
-// NOTE: We do not store passwords in DB. The client must send credentials with every fetch request.
 app.post('/api/mail/messages', async (req, res) => {
   const { config } = req.body;
   if (!config || !config.password) {
@@ -240,9 +238,9 @@ app.post('/api/mail/messages', async (req, res) => {
         struct: true
       };
       
-      // Fetch only last 10 messages for performance
+      // Fetch last 50 messages
       const messages = await connection.search(searchCriteria, fetchOptions);
-      const recentMessages = messages.slice(-10).reverse();
+      const recentMessages = messages.slice(-50).reverse();
 
       for (const item of recentMessages) {
         const all = item.parts.find(p => p.which === 'TEXT');
@@ -276,7 +274,8 @@ app.post('/api/mail/messages', async (req, res) => {
 
       const list = await pop3.LIST();
       const total = list.length;
-      const start = Math.max(1, total - 4); // Fetch last 5
+      // Fetch last 50 messages
+      const start = Math.max(1, total - 49); 
       
       for (let i = total; i >= start; i--) {
         const raw = await pop3.RETR(i);
