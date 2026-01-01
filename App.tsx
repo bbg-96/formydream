@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen } from 'lucide-react';
-import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem } from './types';
+import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem, User } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TaskBoard } from './components/TaskBoard';
 import { GeminiChat } from './components/GeminiChat';
 import { Schedule } from './components/Schedule';
 import { KnowledgeBase } from './components/KnowledgeBase';
+import { Auth } from './components/Auth';
 
 // Helper to get today's date in YYYY-MM-DD format
 const getToday = () => new Date().toISOString().split('T')[0];
@@ -84,9 +85,29 @@ const INITIAL_KNOWLEDGE: KnowledgeItem[] = [
 ];
 
 const App: React.FC = () => {
+  const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<ViewMode>('DASHBOARD');
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>(INITIAL_KNOWLEDGE);
+
+  useEffect(() => {
+    // Check local storage for existing session
+    const savedUser = localStorage.getItem('cloudops_user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+  }, []);
+
+  const handleLogin = (loggedInUser: User) => {
+    setUser(loggedInUser);
+    localStorage.setItem('cloudops_user', JSON.stringify(loggedInUser));
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('cloudops_user');
+    setCurrentView('DASHBOARD');
+  };
 
   // Layout Components
   const SidebarItem: React.FC<{ view: ViewMode; icon: React.ReactNode; label: string }> = ({ view, icon, label }) => (
@@ -102,6 +123,10 @@ const App: React.FC = () => {
       <span className="font-medium">{label}</span>
     </button>
   );
+
+  if (!user) {
+    return <Auth onLogin={handleLogin} />;
+  }
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
@@ -126,7 +151,10 @@ const App: React.FC = () => {
         </nav>
 
         <div className="p-4 border-t border-slate-700">
-          <button className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors w-full px-4 py-2">
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors w-full px-4 py-2"
+          >
             <LogOut size={18} />
             <span className="text-sm">로그아웃</span>
           </button>
@@ -146,11 +174,12 @@ const App: React.FC = () => {
           </h2>
           <div className="flex items-center gap-4">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-semibold text-gray-700">Cloud Engineer</p>
-              <p className="text-xs text-gray-500">MSP Tech Team</p>
+              <p className="text-sm font-semibold text-gray-700">{user.name}</p>
+              <p className="text-xs text-gray-500">{user.role}</p>
             </div>
-            <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center text-slate-600 font-bold">
-              CE
+            <div className="w-10 h-10 rounded-full bg-slate-200 border-2 border-white shadow-sm flex items-center justify-center text-slate-600 font-bold overflow-hidden">
+               {/* Avatar Placeholder */}
+               {user.name.charAt(0).toUpperCase()}
             </div>
           </div>
         </header>

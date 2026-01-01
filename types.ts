@@ -1,3 +1,4 @@
+
 export enum TaskStatus {
   TODO = 'TODO',
   IN_PROGRESS = 'IN_PROGRESS',
@@ -10,6 +11,13 @@ export enum TaskPriority {
   MEDIUM = 'MEDIUM',
   HIGH = 'HIGH',
   CRITICAL = 'CRITICAL',
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
 }
 
 export interface SubTask {
