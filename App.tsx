@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote, ChevronUp, ChevronDown } from 'lucide-react';
-import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem, User, MailAccount } from './types';
+import React, { useState, useEffect, useRef } from 'react';
+import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote, ChevronUp, ChevronDown, Palette, Check } from 'lucide-react';
+import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem, User, MailAccount, ThemeConfig } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TaskBoard } from './components/TaskBoard';
 import { GeminiChat } from './components/GeminiChat';
@@ -32,6 +32,67 @@ const getFutureDate = (days: number) => {
   const offset = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - offset).toISOString().split('T')[0];
 };
+
+// --- THEME DEFINITIONS ---
+const THEMES: ThemeConfig[] = [
+  {
+    id: 'default',
+    name: 'CloudOps Default',
+    sidebarStyle: { backgroundColor: '#0f172a' }, // slate-900
+    sidebarTextColor: 'text-slate-300',
+    mainStyle: { backgroundColor: '#f9fafb' }, // gray-50
+  },
+  {
+    id: 'ocean',
+    name: 'Ocean Breeze',
+    sidebarStyle: { 
+      background: 'linear-gradient(180deg, #0f4c75 0%, #3282b8 100%)',
+    },
+    sidebarTextColor: 'text-blue-100',
+    mainStyle: { 
+      backgroundColor: '#f0f9ff',
+      backgroundImage: 'radial-gradient(#e0f2fe 1px, transparent 1px)',
+      backgroundSize: '20px 20px'
+    },
+  },
+  {
+    id: 'forest',
+    name: 'Forest Serenity',
+    sidebarStyle: { 
+      backgroundColor: '#14532d',
+      backgroundImage: 'url("https://images.unsplash.com/photo-1511497584788-876760111969?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60")', // Dark Forest
+      backgroundSize: 'cover',
+      backgroundBlendMode: 'overlay'
+    },
+    sidebarTextColor: 'text-green-100',
+    mainStyle: { backgroundColor: '#f0fdf4' },
+  },
+  {
+    id: 'sunset',
+    name: 'Sunset Glow',
+    sidebarStyle: { 
+      background: 'linear-gradient(135deg, #4c1d95 0%, #db2777 100%)', // Purple to Pink
+    },
+    sidebarTextColor: 'text-purple-100',
+    mainStyle: { 
+      backgroundColor: '#fff1f2',
+    },
+  },
+  {
+    id: 'nebula',
+    name: 'Midnight Nebula',
+    sidebarStyle: { 
+      backgroundColor: '#000000',
+      backgroundImage: 'url("https://images.unsplash.com/photo-1436891620584-47fd0e565afb?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60")', // Space
+      backgroundSize: 'cover',
+    },
+    sidebarTextColor: 'text-gray-200',
+    mainStyle: { 
+       backgroundColor: '#f3f4f6', // Keep content light for readability
+       borderLeft: '1px solid #e5e7eb'
+    },
+  }
+];
 
 // Fallback Mock Data for Tasks (Used if API connection fails)
 const FALLBACK_TASKS: Task[] = [
@@ -108,8 +169,14 @@ const App: React.FC = () => {
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
   const [showHeader, setShowHeader] = useState(true);
   
+  // Theme State
+  const [currentTheme, setCurrentTheme] = useState<ThemeConfig>(THEMES[0]);
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  
   // Mail State (Lifted Up) with Persistence
   const [mailAccounts, setMailAccounts] = useState<MailAccount[]>([]);
+  
+  const themeMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Check local storage for existing session
@@ -119,6 +186,23 @@ const App: React.FC = () => {
       setUser(parsedUser);
       loadData(parsedUser.id);
     }
+    // Load theme
+    const savedThemeId = localStorage.getItem('cloudops_theme_id');
+    if (savedThemeId) {
+      const found = THEMES.find(t => t.id === savedThemeId);
+      if (found) setCurrentTheme(found);
+    }
+  }, []);
+
+  // Handle click outside for theme menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (themeMenuRef.current && !themeMenuRef.current.contains(event.target as Node)) {
+        setIsThemeMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   // Persist Mail Accounts Logic
@@ -171,39 +255,52 @@ const App: React.FC = () => {
     setCurrentView('DASHBOARD');
     setTasks([]);
     setKnowledgeItems([]);
-    // Mail accounts persist on logout as per previous requirement fix
+  };
+
+  const changeTheme = (theme: ThemeConfig) => {
+      setCurrentTheme(theme);
+      localStorage.setItem('cloudops_theme_id', theme.id);
+      setIsThemeMenuOpen(false);
   };
 
   // Layout Components
-  const SidebarItem: React.FC<{ view: ViewMode; icon: React.ReactNode; label: string }> = ({ view, icon, label }) => (
-    <button
-      onClick={() => setCurrentView(view)}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
-        currentView === view 
-          ? 'bg-blue-600 text-white shadow-md' 
-          : 'text-gray-400 hover:bg-slate-800 hover:text-white'
-      }`}
-    >
-      {icon}
-      <span className="font-medium">{label}</span>
-    </button>
-  );
+  const SidebarItem: React.FC<{ view: ViewMode; icon: React.ReactNode; label: string }> = ({ view, icon, label }) => {
+    const isSelected = currentView === view;
+    // Calculate dynamic hover/active styles based on theme brightness could be complex, 
+    // so we use semi-transparent white/black overlays.
+    return (
+      <button
+        onClick={() => setCurrentView(view)}
+        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 
+          ${isSelected 
+            ? 'bg-white/20 shadow-sm text-white font-bold backdrop-blur-sm' 
+            : `${currentTheme.sidebarTextColor} hover:bg-white/10 hover:text-white`
+          }`}
+      >
+        {icon}
+        <span className="font-medium">{label}</span>
+      </button>
+    );
+  };
 
   if (!user) {
     return <Auth onLogin={handleLogin} />;
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 text-white flex flex-col shadow-xl z-20">
-        <div className="p-6 flex items-center gap-3 border-b border-slate-700">
-          <div className="p-2 bg-blue-600 rounded-lg">
+      <aside 
+        className="w-64 flex flex-col shadow-xl z-20 transition-all duration-500 ease-in-out"
+        style={currentTheme.sidebarStyle}
+      >
+        <div className="p-6 flex items-center gap-3 border-b border-white/10">
+          <div className="p-2 bg-white/20 backdrop-blur-md rounded-lg shadow-sm">
             <Cloud size={24} className="text-white" />
           </div>
           <div>
-            <h1 className="text-lg font-bold tracking-wide">CloudOps</h1>
-            <p className="text-xs text-slate-400">Mate v1.0</p>
+            <h1 className="text-lg font-bold tracking-wide text-white">CloudOps</h1>
+            <p className="text-xs text-white/60">Mate v1.0</p>
           </div>
         </div>
 
@@ -217,12 +314,10 @@ const App: React.FC = () => {
           <SidebarItem view="AI_CHAT" icon={<Bot size={20} />} label="AI 어시스턴트" />
         </nav>
 
-        <div className="p-4 border-t border-slate-700 space-y-2">
-          {/* Sidebar Hide Toggle Removed */}
-
+        <div className="p-4 border-t border-white/10 space-y-2">
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors w-full px-4 py-2"
+            className={`flex items-center gap-2 transition-colors w-full px-4 py-2 ${currentTheme.sidebarTextColor} hover:text-white hover:bg-white/10 rounded-lg`}
           >
             <LogOut size={18} />
             <span className="text-sm">로그아웃</span>
@@ -231,7 +326,10 @@ const App: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+      <main 
+        className="flex-1 flex flex-col min-w-0 overflow-hidden relative transition-all duration-500"
+        style={currentTheme.mainStyle}
+      >
         
         {/* Floating Restore Button (Visible when header is hidden) */}
         {!showHeader && (
@@ -246,8 +344,8 @@ const App: React.FC = () => {
 
         {/* Header */}
         {showHeader && (
-          <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-8 shadow-sm z-10 transition-all">
-            <h2 className="text-xl font-bold text-gray-800">
+          <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200/50 h-16 flex items-center justify-between px-8 shadow-sm z-10 transition-all">
+            <h2 className="text-xl font-bold text-gray-800 tracking-tight">
               {currentView === 'DASHBOARD' && 'Dashboard'}
               {currentView === 'TASKS' && 'Task Board'}
               {currentView === 'SCHEDULE' && 'Schedule'}
@@ -258,6 +356,42 @@ const App: React.FC = () => {
               {currentView === 'MY_PAGE' && 'My Page'}
             </h2>
             <div className="flex items-center gap-4">
+              
+              {/* Theme Selector */}
+              <div className="relative" ref={themeMenuRef}>
+                 <button 
+                    onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
+                    className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors flex items-center gap-2"
+                    title="테마 변경"
+                 >
+                     <Palette size={20} />
+                 </button>
+
+                 {isThemeMenuOpen && (
+                     <div className="absolute top-full right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 py-2 z-50 animate-fade-in-up">
+                         <div className="px-4 py-2 border-b border-gray-50 mb-1">
+                             <span className="text-xs font-bold text-gray-500">테마 선택</span>
+                         </div>
+                         {THEMES.map(theme => (
+                             <button
+                                key={theme.id}
+                                onClick={() => changeTheme(theme)}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center justify-between group"
+                             >
+                                <div className="flex items-center gap-2">
+                                    <div 
+                                        className="w-4 h-4 rounded-full border border-gray-200"
+                                        style={{ background: theme.sidebarStyle.background || theme.sidebarStyle.backgroundColor }}
+                                    ></div>
+                                    {theme.name}
+                                </div>
+                                {currentTheme.id === theme.id && <Check size={14} className="text-blue-600" />}
+                             </button>
+                         ))}
+                     </div>
+                 )}
+              </div>
+
               <div 
                 className="flex items-center gap-4 cursor-pointer hover:bg-gray-50 p-1.5 pr-4 rounded-full transition-colors group"
                 onClick={() => setCurrentView('MY_PAGE')}
@@ -290,7 +424,7 @@ const App: React.FC = () => {
         )}
 
         {/* View Content */}
-        <div className="flex-1 overflow-auto bg-gray-50/50 p-2 sm:p-4">
+        <div className="flex-1 overflow-auto p-2 sm:p-4 scrollbar-thin scrollbar-thumb-gray-300">
           {currentView === 'DASHBOARD' && <Dashboard tasks={tasks} />}
           {currentView === 'TASKS' && <TaskBoard tasks={tasks} setTasks={setTasks} />}
           {currentView === 'AI_CHAT' && <GeminiChat tasks={tasks} knowledgeItems={knowledgeItems} />}

@@ -96,3 +96,12 @@ export interface AIBreakdownResponse {
 }
 
 export type ViewMode = 'DASHBOARD' | 'TASKS' | 'SCHEDULE' | 'KNOWLEDGE' | 'AI_CHAT' | 'MY_PAGE' | 'MAIL' | 'MEMO';
+
+export interface ThemeConfig {
+  id: string;
+  name: string;
+  sidebarStyle: React.CSSProperties;
+  mainStyle: React.CSSProperties;
+  sidebarTextColor: string; // tailwind class e.g. 'text-white'
+  headerStyle?: React.CSSProperties;
+}
