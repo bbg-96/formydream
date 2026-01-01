@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Cloud, Lock, Mail, User as UserIcon, ArrowRight, Loader2 } from 'lucide-react';
+import { Cloud, Lock, Mail, User as UserIcon, ArrowRight, Loader2, CheckCircle } from 'lucide-react';
 import { User } from '../types';
 import { api } from '../services/api';
 
@@ -14,12 +14,26 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
   // Form State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    // Signup Validation
+    if (!isLogin) {
+      if (password !== confirmPassword) {
+        setError('비밀번호가 일치하지 않습니다.');
+        return;
+      }
+      if (password.length < 6) {
+        setError('비밀번호는 최소 6자 이상이어야 합니다.');
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -35,6 +49,14 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
     } finally {
         setLoading(false);
     }
+  };
+
+  const toggleMode = () => {
+    setIsLogin(!isLogin);
+    setError('');
+    setPassword('');
+    setConfirmPassword('');
+    // Keep email/name for convenience or clear them if preferred
   };
 
   return (
@@ -107,6 +129,36 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               </div>
             </div>
 
+            {!isLogin && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-gray-700 ml-1">비밀번호 확인</label>
+                <div className="relative">
+                  <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    {confirmPassword && password === confirmPassword ? (
+                      <CheckCircle size={20} className="text-green-500" />
+                    ) : (
+                      <Lock size={20} />
+                    )}
+                  </div>
+                  <input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:border-transparent outline-none transition-all ${
+                      confirmPassword && password !== confirmPassword 
+                        ? 'border-red-300 focus:ring-red-200 bg-red-50' 
+                        : 'border-gray-200 focus:ring-blue-500'
+                    }`}
+                    placeholder="비밀번호 재입력"
+                    required={!isLogin}
+                  />
+                </div>
+                {confirmPassword && password !== confirmPassword && (
+                    <p className="text-xs text-red-500 ml-1">비밀번호가 일치하지 않습니다.</p>
+                )}
+              </div>
+            )}
+
             {error && (
               <p className="text-red-500 text-sm text-center bg-red-50 py-2 rounded-lg">{error}</p>
             )}
@@ -131,10 +183,7 @@ export const Auth: React.FC<AuthProps> = ({ onLogin }) => {
             <p className="text-gray-500 text-sm">
               {isLogin ? '계정이 없으신가요?' : '이미 계정이 있으신가요?'}
               <button
-                onClick={() => {
-                    setIsLogin(!isLogin);
-                    setError('');
-                }}
+                onClick={toggleMode}
                 className="ml-2 text-blue-600 font-semibold hover:text-blue-700 transition-colors"
               >
                 {isLogin ? '회원가입' : '로그인'}
