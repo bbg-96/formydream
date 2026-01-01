@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { Task, TaskStatus, TaskPriority } from '../types';
-import { AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, ListTodo } from 'lucide-react';
 
 interface DashboardProps {
   tasks: Task[];
@@ -44,8 +44,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
     <div className="p-6 space-y-6 animate-fade-in">
       <h2 className="text-2xl font-bold text-gray-800">CloudOps 개요</h2>
 
-      {/* Top Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Top Cards - Updated to 4 columns */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* To Do Card */}
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
+          <div className="p-3 bg-indigo-100 rounded-lg text-indigo-600">
+            <ListTodo size={24} />
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">대기 중 (To Do)</p>
+            <p className="text-2xl font-bold text-gray-800">{tasks.filter(t => t.status === TaskStatus.TODO).length}</p>
+          </div>
+        </div>
+
+        {/* In Progress Card */}
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
           <div className="p-3 bg-blue-100 rounded-lg text-blue-600">
             <Clock size={24} />
@@ -55,6 +67,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
             <p className="text-2xl font-bold text-gray-800">{tasks.filter(t => t.status === TaskStatus.IN_PROGRESS).length}</p>
           </div>
         </div>
+
+        {/* Urgent Card */}
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
           <div className="p-3 bg-red-100 rounded-lg text-red-600">
             <AlertCircle size={24} />
@@ -64,6 +78,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
             <p className="text-2xl font-bold text-gray-800">{tasks.filter(t => t.priority === TaskPriority.CRITICAL && t.status !== TaskStatus.DONE).length}</p>
           </div>
         </div>
+
+        {/* Done Card */}
         <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center space-x-4">
           <div className="p-3 bg-green-100 rounded-lg text-green-600">
             <CheckCircle2 size={24} />
