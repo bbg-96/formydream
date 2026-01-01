@@ -2,7 +2,6 @@ const express = require('express');
 const { Pool } = require('pg');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
-const mailRoutes = require('./mailRoutes');
 
 const app = express();
 
@@ -10,12 +9,24 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// [DB Connection Config]
 const pool = new Pool({
   user: 'postgres',
   host: '10.200.0.159', 
   database: 'cloudops_db',
   password: '03474506', // [비밀번호 확인]
   port: 5432,
+});
+
+// [DB Connection Test on Startup]
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error('Error acquiring client', err.stack);
+    console.error('!!! DATABASE CONNECTION FAILED !!! - Check host, password, or network.');
+  } else {
+    console.log('>>> Database Connected Successfully to 10.200.0.159');
+    release();
+  }
 });
 
 // --- Auth ---
@@ -30,7 +41,10 @@ app.post('/api/signup', async (req, res) => {
       [name, email, hashedPassword, 'Cloud Engineer']
     );
     res.json(result.rows[0]);
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+      console.error('Signup Error:', err);
+      res.status(500).json({ error: err.message }); 
+  }
 });
 
 app.post('/api/login', async (req, res) => {
@@ -45,7 +59,10 @@ app.post('/api/login', async (req, res) => {
     } else {
       res.status(401).json({ message: "Invalid credentials" });
     }
-  } catch (err) { res.status(500).json({ error: err.message }); }
+  } catch (err) { 
+      console.error('Login Error:', err);
+      res.status(500).json({ error: err.message }); 
+  }
 });
 
 // --- Tasks ---
@@ -65,7 +82,10 @@ app.get('/api/tasks', async (req, res) => {
         createdAt: row.created_at
     }));
     res.json(formatted);
-  } catch (err) { console.error(err); res.json([]); }
+  } catch (err) { 
+      console.error('Get Tasks Error:', err);
+      res.status(500).json([]); // Return empty array on error but log it
+  }
 });
 
 app.post('/api/tasks', async (req, res) => {
@@ -79,14 +99,20 @@ app.post('/api/tasks', async (req, res) => {
             [id, userId, title, description, status, priority, dueDate, tags, JSON.stringify(subTasks), createdAt]
         );
         res.json({ success: true });
-    } catch(err) { console.error(err); res.status(500).json({error: err.message}); }
+    } catch(err) { 
+        console.error('Save Task Error:', err);
+        res.status(500).json({error: err.message}); 
+    }
 });
 
 app.delete('/api/tasks/:id', async (req, res) => {
     try {
         await pool.query('DELETE FROM tasks WHERE id = $1', [req.params.id]);
         res.json({ success: true });
-    } catch(err) { res.status(500).json({error: err.message}); }
+    } catch(err) { 
+        console.error('Delete Task Error:', err);
+        res.status(500).json({error: err.message}); 
+    }
 });
 
 // --- Knowledge ---
@@ -104,7 +130,10 @@ app.get('/api/knowledge', async (req, res) => {
             createdAt: row.created_at
         }));
         res.json(formatted);
-    } catch (err) { console.error(err); res.json([]); }
+    } catch (err) { 
+        console.error('Get Knowledge Error:', err);
+        res.status(500).json([]); 
+    }
 });
 
 app.post('/api/knowledge', async (req, res) => {
@@ -118,14 +147,20 @@ app.post('/api/knowledge', async (req, res) => {
             [id, userId, title, content, category, tags, isDraft, createdAt]
         );
         res.json({ success: true });
-    } catch(err) { console.error(err); res.status(500).json({error: err.message}); }
+    } catch(err) { 
+        console.error('Save Knowledge Error:', err);
+        res.status(500).json({error: err.message}); 
+    }
 });
 
 app.delete('/api/knowledge/:id', async (req, res) => {
     try {
         await pool.query('DELETE FROM knowledge WHERE id = $1', [req.params.id]);
         res.json({ success: true });
-    } catch(err) { res.status(500).json({error: err.message}); }
+    } catch(err) { 
+        console.error('Delete Knowledge Error:', err);
+        res.status(500).json({error: err.message}); 
+    }
 });
 
 app.put('/api/knowledge/:id', async (req, res) => {
@@ -137,7 +172,10 @@ app.put('/api/knowledge/:id', async (req, res) => {
              [title, content, category, tags, isDraft, id]
         );
         res.json({ success: true });
-    } catch(err) { res.status(500).json({error: err.message}); }
+    } catch(err) { 
+        console.error('Update Knowledge Error:', err);
+        res.status(500).json({error: err.message}); 
+    }
 });
 
 // --- User Settings ---
@@ -155,9 +193,6 @@ app.put('/api/users/:id/password', async (req, res) => {
   }
 });
 
-// =================================================================
-// [Mail Integration Routes]
-// =================================================================
-app.use('/api/mail', mailRoutes);
+// Mail routes are removed from here. Run mailServer.js separately if needed.
 
 app.listen(3001, '0.0.0.0', () => console.log('Server running on 3001'));

@@ -6,6 +6,8 @@ import { User, Task, KnowledgeItem, Email } from '../types';
 const VM_IP = '10.200.0.160'; 
 
 const API_BASE_URL = `http://${VM_IP}:3001/api`;
+// 별도로 실행되는 메일 서버 포트(3002)
+const MAIL_API_BASE_URL = `http://${VM_IP}:3002/api/mail`;
 
 // Helper to handle response
 const handleResponse = async (response: Response) => {
@@ -133,7 +135,8 @@ export const api = {
   mail: {
     connect: async (userId: string | number, config: any): Promise<boolean> => {
       try {
-        const response = await fetch(`${API_BASE_URL}/mail/connect`, {
+        // Points to Port 3002
+        const response = await fetch(`${MAIL_API_BASE_URL}/connect`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...config, userId }),
@@ -141,20 +144,21 @@ export const api = {
         if (!response.ok) throw new Error('Connect failed');
         return true;
       } catch (e) {
-        console.error("Failed to connect mail", e);
+        console.error("Failed to connect mail (Mail Server might be down)", e);
         return false;
       }
     },
     getMessages: async (userId: string | number, config: any, lastUid?: string | number): Promise<{ emails: Email[], latestUid: string | number }> => {
       try {
-        const response = await fetch(`${API_BASE_URL}/mail/messages`, {
+        // Points to Port 3002
+        const response = await fetch(`${MAIL_API_BASE_URL}/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId, config, lastUid })
         });
         return handleResponse(response);
       } catch (e) {
-        console.error("Failed to get messages", e);
+        console.error("Failed to get messages (Mail Server might be down)", e);
         return { emails: [], latestUid: lastUid || 0 };
       }
     }
