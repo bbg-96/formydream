@@ -218,14 +218,7 @@ const App: React.FC = () => {
         </nav>
 
         <div className="p-4 border-t border-slate-700 space-y-2">
-          <button 
-            onClick={() => setShowHeader(!showHeader)}
-            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors w-full px-4 py-2"
-            title={showHeader ? '상단바 숨기기' : '상단바 보이기'}
-          >
-            {showHeader ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-            <span className="text-sm">{showHeader ? '상단바 숨기기' : '상단바 보이기'}</span>
-          </button>
+          {/* Sidebar Hide Toggle Removed */}
 
           <button 
             onClick={handleLogout}
@@ -238,7 +231,19 @@ const App: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+        
+        {/* Floating Restore Button (Visible when header is hidden) */}
+        {!showHeader && (
+          <button
+            onClick={() => setShowHeader(true)}
+            className="absolute top-4 right-6 z-50 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 shadow-md rounded-full text-gray-500 hover:text-blue-600 transition-all hover:scale-110"
+            title="상단바 보이기"
+          >
+            <ChevronDown size={20} />
+          </button>
+        )}
+
         {/* Header */}
         {showHeader && (
           <header className="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-8 shadow-sm z-10 transition-all">
@@ -269,6 +274,17 @@ const App: React.FC = () => {
                   </div>
                 </div>
               </div>
+
+              <div className="w-px h-6 bg-gray-200 mx-1"></div>
+
+              {/* Header Hide Button */}
+              <button
+                onClick={() => setShowHeader(false)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+                title="상단바 숨기기"
+              >
+                <ChevronUp size={20} />
+              </button>
             </div>
           </header>
         )}
