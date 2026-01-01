@@ -121,7 +121,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     // Save accounts whenever they change
-    // Note: Storing password in localStorage is not secure for production but allowed for this prototype per user request.
     if (mailAccounts.length > 0) {
         localStorage.setItem('cloudops_mail_accounts', JSON.stringify(mailAccounts));
     }
@@ -157,16 +156,7 @@ const App: React.FC = () => {
     setCurrentView('DASHBOARD');
     setTasks([]);
     setKnowledgeItems([]);
-    // Do not clear mail accounts on logout if we want them "persistent", 
-    // but usually logout implies clearing sensitive data. 
-    // However, user asked for "refresh/logout disconnects" fix.
-    // If they want to keep it connected "like an app", we might keep it.
-    // BUT for security, standard practice is to clear.
-    // Given the user specifically complained about "logout disconnects", 
-    // I will comment this out or keep it based on "disconnection is annoying".
-    // Let's clear it for proper "Logout" behavior but keeping it on "Refresh" is the main fix.
-    // Update: User said "Refresh OR Logout disconnects". I will CLEAR on logout, but KEEP on refresh.
-    // setMailAccounts([]); 
+    // Mail accounts persist on logout as per previous requirement fix
   };
 
   // Layout Components
@@ -206,7 +196,7 @@ const App: React.FC = () => {
           <SidebarItem view="DASHBOARD" icon={<LayoutDashboard size={20} />} label="대시보드" />
           <SidebarItem view="TASKS" icon={<ListTodo size={20} />} label="업무 관리" />
           <SidebarItem view="SCHEDULE" icon={<CalendarIcon size={20} />} label="일정" />
-          <SidebarItem view="MAIL" icon={<Mail size={20} />} label="메일함" />
+          {/* <SidebarItem view="MAIL" icon={<Mail size={20} />} label="메일함" /> */}
           <SidebarItem view="KNOWLEDGE" icon={<BookOpen size={20} />} label="지식 저장소" />
           <SidebarItem view="AI_CHAT" icon={<Bot size={20} />} label="AI 어시스턴트" />
         </nav>
@@ -261,14 +251,14 @@ const App: React.FC = () => {
           {currentView === 'TASKS' && <TaskBoard tasks={tasks} setTasks={setTasks} />}
           {currentView === 'AI_CHAT' && <GeminiChat tasks={tasks} />}
           {currentView === 'SCHEDULE' && <Schedule tasks={tasks} />}
-          {currentView === 'MAIL' && (
+          {/* {currentView === 'MAIL' && (
             <MailClient 
               user={user} 
               setTasks={setTasks} 
               mailAccounts={mailAccounts} 
               setMailAccounts={setMailAccounts} 
             />
-          )}
+          )} */}
           {currentView === 'KNOWLEDGE' && <KnowledgeBase items={knowledgeItems} setItems={setKnowledgeItems} />}
           {currentView === 'MY_PAGE' && <MyPage user={user} />}
         </div>
