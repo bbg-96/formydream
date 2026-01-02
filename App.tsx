@@ -164,7 +164,14 @@ const FALLBACK_KNOWLEDGE: KnowledgeItem[] = [
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
-  const [currentView, setCurrentView] = useState<ViewMode>('DASHBOARD');
+  
+  // View State (Persistent)
+  // [수정됨] localStorage에서 저장된 뷰가 있으면 불러오고, 없으면 DASHBOARD를 기본값으로 사용
+  const [currentView, setCurrentView] = useState<ViewMode>(() => {
+    const savedView = localStorage.getItem('cloudops_active_view');
+    return (savedView as ViewMode) || 'DASHBOARD';
+  });
+  
   const [tasks, setTasks] = useState<Task[]>([]);
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
   
@@ -230,6 +237,11 @@ const App: React.FC = () => {
         try { setSidebarImagePos(JSON.parse(savedSidebarPos)); } catch(e) {}
     }
   }, []);
+
+  // [수정됨] currentView가 변경될 때마다 localStorage에 저장
+  useEffect(() => {
+    localStorage.setItem('cloudops_active_view', currentView);
+  }, [currentView]);
 
   // Toggle Header and Save to LocalStorage
   const toggleHeader = (visible: boolean) => {
@@ -320,6 +332,7 @@ const App: React.FC = () => {
     setUser(null);
     localStorage.removeItem('cloudops_user');
     setCurrentView('DASHBOARD');
+    localStorage.removeItem('cloudops_active_view'); // [선택] 로그아웃 시 뷰 설정도 초기화
     setTasks([]);
     setKnowledgeItems([]);
   };
