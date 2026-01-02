@@ -167,7 +167,12 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewMode>('DASHBOARD');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
-  const [showHeader, setShowHeader] = useState(true);
+  
+  // Header Visibility State (Persistent)
+  const [showHeader, setShowHeader] = useState(() => {
+    const saved = localStorage.getItem('cloudops_header_visible');
+    return saved === null ? true : saved === 'true';
+  });
   
   // Theme State
   const [currentTheme, setCurrentTheme] = useState<ThemeConfig>(THEMES[0]);
@@ -225,6 +230,12 @@ const App: React.FC = () => {
         try { setSidebarImagePos(JSON.parse(savedSidebarPos)); } catch(e) {}
     }
   }, []);
+
+  // Toggle Header and Save to LocalStorage
+  const toggleHeader = (visible: boolean) => {
+      setShowHeader(visible);
+      localStorage.setItem('cloudops_header_visible', String(visible));
+  };
 
   // Scroll Handler for Mobile Nav
   useEffect(() => {
@@ -472,7 +483,7 @@ const App: React.FC = () => {
         {/* Floating Restore Button (Visible when header is hidden) */}
         {!showHeader && (
           <button
-            onClick={() => setShowHeader(true)}
+            onClick={() => toggleHeader(true)}
             className="hidden md:block absolute top-4 right-6 z-50 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 shadow-md rounded-full text-gray-500 hover:text-blue-600 transition-all hover:scale-110"
             title="상단바 보이기"
           >
@@ -670,7 +681,7 @@ const App: React.FC = () => {
 
               {/* Header Hide Button */}
               <button
-                onClick={() => setShowHeader(false)}
+                onClick={() => toggleHeader(false)}
                 className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors hidden sm:block"
                 title="상단바 숨기기"
               >
@@ -682,7 +693,8 @@ const App: React.FC = () => {
 
         {/* View Content */}
         {/* Changed overflow handling for mobile: Allow body scroll by removing md:overflow-auto on mobile */}
-        <div className={`flex-1 md:overflow-auto p-2 sm:p-4 scrollbar-thin scrollbar-thumb-gray-300 ${customMainImage ? 'bg-white/80 backdrop-blur-sm rounded-tl-2xl mt-2 ml-2 shadow-inner' : ''}`}>
+        {/* Added conditional padding removal for AI_CHAT to enable full layout */}
+        <div className={`flex-1 md:overflow-auto ${currentView === 'AI_CHAT' ? 'p-0' : 'p-2 sm:p-4'} scrollbar-thin scrollbar-thumb-gray-300 ${customMainImage ? 'bg-white/80 backdrop-blur-sm rounded-tl-2xl mt-2 ml-2 shadow-inner' : ''}`}>
           {currentView === 'DASHBOARD' && <Dashboard tasks={tasks} />}
           {currentView === 'TASKS' && <TaskBoard tasks={tasks} setTasks={setTasks} />}
           {currentView === 'AI_CHAT' && <GeminiChat tasks={tasks} knowledgeItems={knowledgeItems} />}

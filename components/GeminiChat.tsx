@@ -205,7 +205,8 @@ export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems })
   const currentSession = sessions.find(s => s.id === currentSessionId);
 
   return (
-    <div className="flex h-full bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden m-4 md:m-6 relative">
+    // Removed margins (m-4 md:m-6), rounded corners (rounded-xl), borders, and shadows to create full-screen layout
+    <div className="flex h-full bg-white overflow-hidden relative">
       
       {/* Sidebar (Chat History) */}
       <div 
