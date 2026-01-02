@@ -24,11 +24,19 @@ interface GeminiChatProps {
 }
 
 export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems }) => {
+  const modelOptions = [
+    { value: 'gemini-3-flash-preview', label: 'gemini-3-flash-preview' },
+    { value: 'gemini-3-flash', label: 'gemini-3-flash' },
+    { value: 'gemini-3-pro', label: 'gemini-3-pro' },
+  ];
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Toggle for mobile/desktop
+  const [selectedModel, setSelectedModel] = useState(
+    () => localStorage.getItem('gemini_model') || modelOptions[0].value
+  );
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -61,6 +69,10 @@ export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems })
       localStorage.setItem('cloudops_chat_sessions', JSON.stringify(sessions));
     }
   }, [sessions]);
+
+  useEffect(() => {
+    localStorage.setItem('gemini_model', selectedModel);
+  }, [selectedModel]);
 
   // Scroll to bottom when messages change in current session
   useEffect(() => {
@@ -293,8 +305,25 @@ export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems })
             </h2>
             <div className="flex items-center gap-2 text-xs text-gray-400">
                  <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                 Powered by Gemini 1.5 Pro
+                 Powered by {selectedModel}
             </div>
+          </div>
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <label htmlFor="gemini-model-select" className="font-medium">
+              모델
+            </label>
+            <select
+              id="gemini-model-select"
+              className="border border-gray-200 rounded-md px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+            >
+              {modelOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
