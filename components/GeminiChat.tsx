@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Loader2, Plus, MessageSquare, Trash2, Menu, X, MoreVertical } from 'lucide-react';
-import { chatWithAssistant } from '../services/geminiService';
+import { Send, Bot, User, Loader2, Plus, MessageSquare, Trash2, Menu, X, MoreVertical, ChevronDown } from 'lucide-react';
+import { chatWithAssistant, AVAILABLE_MODELS } from '../services/geminiService';
 import { Task, KnowledgeItem } from '../types';
 
 interface Message {
@@ -24,23 +24,18 @@ interface GeminiChatProps {
 }
 
 export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems }) => {
-  const modelOptions = [
-    { value: 'gemini-3-flash-preview', label: 'gemini-3-flash-preview' },
-    { value: 'gemini-3-flash', label: 'gemini-3-flash' },
-    { value: 'gemini-3-pro', label: 'gemini-3-pro' },
-  ];
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Toggle for mobile/desktop
-  const [selectedModel, setSelectedModel] = useState(
-    () => localStorage.getItem('gemini_model') || modelOptions[0].value
-  );
   
+  // Model Selection State
+  const [selectedModel, setSelectedModel] = useState(AVAILABLE_MODELS[0].id);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Load Sessions from LocalStorage on mount
+  // Load Sessions and Selected Model from LocalStorage on mount
   useEffect(() => {
     const savedSessions = localStorage.getItem('cloudops_chat_sessions');
     if (savedSessions) {
@@ -61,6 +56,12 @@ export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems })
     } else {
       createNewSession();
     }
+
+    // Load saved model preference
+    const savedModel = localStorage.getItem('cloudops_selected_model');
+    if (savedModel && AVAILABLE_MODELS.some(m => m.id === savedModel)) {
+        setSelectedModel(savedModel);
+    }
   }, []);
 
   // Save Sessions to LocalStorage whenever they change
@@ -70,10 +71,6 @@ export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems })
     }
   }, [sessions]);
 
-  useEffect(() => {
-    localStorage.setItem('gemini_model', selectedModel);
-  }, [selectedModel]);
-
   // Scroll to bottom when messages change in current session
   useEffect(() => {
     scrollToBottom();
@@ -81,6 +78,11 @@ export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems })
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handleModelChange = (modelId: string) => {
+      setSelectedModel(modelId);
+      localStorage.setItem('cloudops_selected_model', modelId);
   };
 
   const createNewSession = () => {
@@ -177,8 +179,8 @@ export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems })
 
     const fullContext = `${taskContext}\n\n${knowledgeContext}\n\nConversation History:\n${historyContext}`;
     
-    // 3. Call API
-    const responseText = await chatWithAssistant(userText, fullContext);
+    // 3. Call API with Selected Model
+    const responseText = await chatWithAssistant(userText, fullContext, selectedModel);
 
     const aiMsg: Message = {
       id: (Date.now() + 1).toString(),
@@ -300,30 +302,25 @@ export const GeminiChat: React.FC<GeminiChatProps> = ({ tasks, knowledgeItems })
             <Bot size={20} />
           </div>
           <div className="flex-1 overflow-hidden">
-            <h2 className="text-gray-800 font-bold truncate">
+            <h2 className="text-gray-800 font-bold truncate text-sm md:text-base">
                 {currentSession?.title || 'CloudOps AI'}
             </h2>
-            <div className="flex items-center gap-2 text-xs text-gray-400">
-                 <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                 Powered by {selectedModel}
+            <div className="flex items-center gap-2 mt-0.5">
+                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0"></span>
+                 <div className="relative group flex items-center">
+                    <span className="text-[10px] text-gray-400 mr-1">Model:</span>
+                    <select
+                        value={selectedModel}
+                        onChange={(e) => handleModelChange(e.target.value)}
+                        className="appearance-none bg-transparent text-xs text-gray-600 font-semibold hover:text-indigo-600 outline-none cursor-pointer pr-3 py-0.5 transition-colors"
+                    >
+                        {AVAILABLE_MODELS.map(model => (
+                            <option key={model.id} value={model.id}>{model.name}</option>
+                        ))}
+                    </select>
+                    <ChevronDown size={10} className="text-gray-400 pointer-events-none group-hover:text-indigo-600" />
+                 </div>
             </div>
-          </div>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <label htmlFor="gemini-model-select" className="font-medium">
-              모델
-            </label>
-            <select
-              id="gemini-model-select"
-              className="border border-gray-200 rounded-md px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-            >
-              {modelOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
           </div>
         </div>
 

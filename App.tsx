@@ -480,14 +480,15 @@ const App: React.FC = () => {
         style={finalMainStyle}
       >
         
-        {/* Floating Restore Button (Visible when header is hidden) */}
+        {/* Floating Restore Button (Centered Top Tab) - Fixed position to avoid overlap with right-side buttons */}
         {!showHeader && (
           <button
             onClick={() => toggleHeader(true)}
-            className="hidden md:block absolute top-4 right-6 z-50 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 shadow-md rounded-full text-gray-500 hover:text-blue-600 transition-all hover:scale-110"
+            className="hidden md:flex absolute top-0 left-1/2 -translate-x-1/2 z-50 bg-white/80 hover:bg-white backdrop-blur-sm border-x border-b border-gray-200 shadow-sm rounded-b-xl px-4 py-1.5 text-gray-400 hover:text-blue-600 transition-all duration-300 items-center gap-1.5 group"
             title="상단바 보이기"
           >
-            <ChevronDown size={20} />
+            <span className="text-[10px] font-semibold opacity-0 group-hover:opacity-100 -ml-4 group-hover:ml-0 transition-all duration-300">Show Header</span>
+            <ChevronDown size={16} />
           </button>
         )}
 

@@ -1,8 +1,11 @@
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { AIBreakdownResponse, KnowledgeItem } from "../types";
 
-const DEFAULT_MODEL = "gemini-3-flash-preview";
-const getSelectedModel = () => localStorage.getItem('gemini_model') || DEFAULT_MODEL;
+// Define available models for selection
+export const AVAILABLE_MODELS = [
+  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash' },
+  { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro' },
+];
 
 // Helper to get the API client with the latest key
 const getAIClient = (): GoogleGenAI | null => {
@@ -21,7 +24,7 @@ export const generateTaskBreakdown = async (taskTitle: string, taskDescription: 
     const ai = getAIClient();
     if (!ai) return null;
 
-    const model = getSelectedModel();
+    const model = "gemini-3-flash-preview";
     
     const schema: Schema = {
       type: Type.OBJECT,
@@ -81,7 +84,7 @@ export const searchKnowledgeBaseWithAI = async (query: string, items: KnowledgeI
         if (!ai) return [];
         if (items.length === 0) return [];
 
-        const model = getSelectedModel();
+        const model = "gemini-3-flash-preview";
         
         // Prepare simplified items list to save tokens, stripping HTML
         const itemsContext = items.map(item => {
@@ -136,12 +139,14 @@ export const searchKnowledgeBaseWithAI = async (query: string, items: KnowledgeI
     }
 };
 
-export const chatWithAssistant = async (message: string, context: string): Promise<string> => {
+export const chatWithAssistant = async (message: string, context: string, modelId: string = "gemini-3-flash-preview"): Promise<string> => {
     try {
         const ai = getAIClient();
         if (!ai) return "Gemini API 키가 설정되지 않았습니다. 마이페이지에서 키를 등록해주세요.";
 
-        const model = getSelectedModel();
+        // Use the selected model
+        const model = modelId;
+        
         const prompt = `
         System Context (Tasks, Knowledge Base, etc.):
         ${context}
@@ -161,6 +166,6 @@ export const chatWithAssistant = async (message: string, context: string): Promi
         return response.text || "죄송합니다. 응답을 생성할 수 없습니다.";
     } catch (e) {
         console.error("Chat error", e);
-        return "AI 서비스 연결에 실패했습니다. API 키를 확인해주세요.";
+        return "AI 서비스 연결에 실패했습니다. API 키를 확인해주세요. (또는 모델이 지원되지 않을 수 있습니다)";
     }
 }
