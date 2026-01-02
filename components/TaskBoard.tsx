@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Task, TaskStatus, TaskPriority, SubTask } from '../types';
-import { Plus, Trash2, CheckSquare, Sparkles, Loader2, ChevronDown, ChevronUp, Calendar, Edit, Clock } from 'lucide-react';
+import { Plus, Trash2, CheckSquare, Sparkles, Loader2, ChevronDown, ChevronUp, Calendar, Edit, Clock, ListTodo } from 'lucide-react';
 import { generateTaskBreakdown } from '../services/geminiService';
 import { api } from '../services/api';
 
@@ -186,7 +186,11 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
     // [Modified] Changed height handling for mobile to allow body scroll
     <div className="md:h-full flex flex-col p-4 md:p-6 md:overflow-hidden min-h-[calc(100vh-80px)] md:min-h-0">
       <div className="flex justify-between items-center mb-4 md:mb-6">
-        <h2 className="text-xl md:text-2xl font-bold text-gray-800">업무 보드</h2>
+        {/* [수정됨] 타이틀 좌측 아이콘 추가 */}
+        <div className="flex items-center gap-2">
+            <ListTodo className="text-blue-600" size={32} />
+            <h2 className="text-xl md:text-2xl font-bold text-gray-800">업무 보드</h2>
+        </div>
         <button
           onClick={() => {
               resetForm();

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { Task, TaskStatus, TaskPriority } from '../types';
-import { AlertCircle, CheckCircle2, Clock, ListTodo } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, ListTodo, LayoutDashboard } from 'lucide-react';
 
 interface DashboardProps {
   tasks: Task[];
@@ -42,7 +42,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ tasks }) => {
 
   return (
     <div className="p-6 space-y-6 animate-fade-in">
-      <h2 className="text-2xl font-bold text-gray-800">CloudOps 개요</h2>
+      {/* [수정됨] 타이틀 좌측 아이콘 추가 */}
+      <div className="flex items-center gap-2 mb-6">
+        <LayoutDashboard className="text-blue-600" size={32} />
+        <h2 className="text-2xl font-bold text-gray-800">CloudOps 개요</h2>
+      </div>
 
       {/* Top Cards - Updated to 4 columns */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

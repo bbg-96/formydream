@@ -165,13 +165,12 @@ const FALLBACK_KNOWLEDGE: KnowledgeItem[] = [
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   
-  // View State (Persistent)
-  // [수정됨] localStorage에서 저장된 뷰가 있으면 불러오고, 없으면 DASHBOARD를 기본값으로 사용
+  // [수정됨] 뷰 상태 초기화 (localStorage 연동)
   const [currentView, setCurrentView] = useState<ViewMode>(() => {
     const savedView = localStorage.getItem('cloudops_active_view');
     return (savedView as ViewMode) || 'DASHBOARD';
   });
-  
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [knowledgeItems, setKnowledgeItems] = useState<KnowledgeItem[]>([]);
   
@@ -238,7 +237,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // [수정됨] currentView가 변경될 때마다 localStorage에 저장
+  // [수정됨] 탭이 변경될 때마다 localStorage에 저장
   useEffect(() => {
     localStorage.setItem('cloudops_active_view', currentView);
   }, [currentView]);
@@ -332,7 +331,7 @@ const App: React.FC = () => {
     setUser(null);
     localStorage.removeItem('cloudops_user');
     setCurrentView('DASHBOARD');
-    localStorage.removeItem('cloudops_active_view'); // [선택] 로그아웃 시 뷰 설정도 초기화
+    localStorage.removeItem('cloudops_active_view'); // Optional: Clear view on logout
     setTasks([]);
     setKnowledgeItems([]);
   };
@@ -467,7 +466,8 @@ const App: React.FC = () => {
 
         <nav className="flex-1 p-4 space-y-2 mt-4 relative z-10 overflow-y-auto">
           <SidebarItem view="DASHBOARD" icon={<LayoutDashboard size={20} />} label="대시보드" />
-          <SidebarItem view="TASKS" icon={<ListTodo size={20} />} label="업무 관리" />
+          {/* [수정됨] label="업무 관리" -> "업무" */}
+          <SidebarItem view="TASKS" icon={<ListTodo size={20} />} label="업무" />
           <SidebarItem view="SCHEDULE" icon={<CalendarIcon size={20} />} label="일정" />
           <SidebarItem view="MEMO" icon={<StickyNote size={20} />} label="퀵 메모" />
           {/* <SidebarItem view="MAIL" icon={<Mail size={20} />} label="메일함" /> */}
