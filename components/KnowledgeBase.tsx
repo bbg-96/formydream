@@ -336,7 +336,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
   // --- Editor View ---
   if (isWriting) {
     return (
-        <div className="h-full flex flex-col bg-white animate-fade-in relative z-0">
+        <div className="h-full flex flex-col bg-white animate-fade-in relative z-0 md:rounded-xl md:shadow-sm md:border md:border-gray-100">
             {/* Exit Confirmation Dialog */}
             {showExitDialog && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
@@ -374,53 +374,54 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
             )}
 
             {/* Editor Header */}
-            <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center bg-white sticky top-0 z-10 shadow-sm">
-                 <div className="flex items-center gap-4">
+            <div className="border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex justify-between items-center bg-white sticky top-0 z-10 shadow-sm">
+                 <div className="flex items-center gap-2 md:gap-4">
                      <button 
                         onClick={handleCancelRequest}
                         className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors"
                      >
-                        <ArrowLeft size={24} />
+                        <ArrowLeft size={20} />
                      </button>
-                     <h2 className="text-lg font-bold text-gray-800">
-                        {editingId ? '지식 수정' : '새 지식 작성'}
+                     <h2 className="text-base md:text-lg font-bold text-gray-800">
+                        {editingId ? '지식 수정' : '새 지식'}
                      </h2>
                  </div>
-                 <div className="flex gap-2">
+                 <div className="flex gap-2 text-sm md:text-base">
                      <button 
                         onClick={handleCancelRequest}
-                        className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+                        className="px-3 py-1.5 md:px-4 md:py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
                      >
                         취소
                      </button>
                      <button 
                         onClick={handleSave}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 font-medium shadow-sm transition-colors"
+                        className="px-3 py-1.5 md:px-4 md:py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 font-medium shadow-sm transition-colors"
                      >
-                        <Save size={18} />
-                        발행하기
+                        <Save size={16} />
+                        <span className="hidden md:inline">발행하기</span>
+                        <span className="md:hidden">저장</span>
                      </button>
                  </div>
             </div>
 
             {/* Editor Body */}
             <div className="flex-1 overflow-y-auto bg-gray-50/50">
-                <div className="max-w-4xl mx-auto my-8 bg-white rounded-xl shadow-sm border border-gray-200 min-h-[calc(100%-4rem)] p-8 sm:p-12 flex flex-col">
+                <div className="max-w-4xl mx-auto my-4 md:my-8 bg-white rounded-xl shadow-sm border border-gray-200 min-h-[calc(100%-2rem)] md:min-h-[calc(100%-4rem)] p-4 md:p-12 flex flex-col">
                     
                     {/* Title Input */}
                     <input 
                         type="text"
                         placeholder="제목을 입력하세요"
-                        className="text-4xl font-bold text-gray-800 placeholder:text-gray-300 w-full outline-none bg-transparent mb-6"
+                        className="text-2xl md:text-4xl font-bold text-gray-800 placeholder:text-gray-300 w-full outline-none bg-transparent mb-4 md:mb-6"
                         value={newTitle}
                         onChange={e => setNewTitle(e.target.value)}
                         autoFocus
                     />
 
                     {/* Meta Controls */}
-                    <div className="flex flex-wrap items-center gap-4 mb-8 text-sm">
-                        <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
-                            <span className="text-gray-500 font-medium">카테고리</span>
+                    <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4 mb-6 md:mb-8 text-sm">
+                        <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors w-fit">
+                            <span className="text-gray-500 font-medium whitespace-nowrap">카테고리</span>
                             <select 
                                 value={newCategory}
                                 onChange={e => setNewCategory(e.target.value as any)}
@@ -443,7 +444,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
                     </div>
 
                     {/* Toolbar */}
-                    <div className="flex items-center gap-2 mb-4 border-b border-gray-100 pb-4 sticky top-0 bg-white z-[5]">
+                    <div className="flex flex-wrap items-center gap-2 mb-4 border-b border-gray-100 pb-4 sticky top-0 bg-white z-[5]">
                         <button 
                             onClick={() => {
                                 saveSelection();
@@ -453,7 +454,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
                             title="이미지 첨부"
                         >
                             <ImageIcon size={18} />
-                            <span>이미지</span>
+                            <span className="hidden sm:inline">이미지</span>
                         </button>
                         <input 
                            type="file" 
@@ -463,7 +464,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
                            onChange={handleFileChange}
                         />
 
-                        <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                        <div className="w-px h-4 bg-gray-200 mx-1 hidden sm:block"></div>
 
                         <div className="flex items-center gap-1 bg-gray-50 rounded-lg p-0.5">
                             <button 
@@ -499,7 +500,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
 
                         <div className="flex-1"></div>
                         
-                        <span className="text-xs text-gray-400">
+                        <span className="text-xs text-gray-400 hidden sm:block">
                             팁: 캡처 이미지를 바로 붙여넣기(Ctrl+V) 하세요.
                         </span>
                     </div>
@@ -511,9 +512,9 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
                         onInput={handleEditorInput}
                         onPaste={handlePaste}
                         onBlur={saveSelection}
-                        className="flex-1 outline-none text-gray-700 leading-relaxed text-lg prose max-w-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-300 focus:outline-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                        className="flex-1 outline-none text-gray-700 leading-relaxed text-base md:text-lg prose max-w-none empty:before:content-[attr(data-placeholder)] empty:before:text-gray-300 focus:outline-none [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
                         data-placeholder="이곳에 내용을 자유롭게 작성하세요..."
-                        style={{ minHeight: '400px' }}
+                        style={{ minHeight: '300px' }}
                     />
                 </div>
             </div>
@@ -523,27 +524,28 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
 
   // --- List View ---
   return (
-    <div className="h-full flex flex-col p-6 animate-fade-in">
+    <div className="h-full flex flex-col p-4 md:p-6 animate-fade-in">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-4 md:mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
             <BookOpen className="text-blue-600" /> 
             지식 저장소
           </h2>
-          <p className="text-sm text-gray-500 mt-1">기술 노하우와 트러블슈팅 가이드를 기록하세요.</p>
+          <p className="text-xs md:text-sm text-gray-500 mt-1">기술 노하우와 트러블슈팅 가이드를 기록하세요.</p>
         </div>
         <button
           onClick={() => handleStartWriting()}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg transition-colors shadow-sm text-sm md:text-base"
         >
           <Plus size={18} />
-          새 기록
+          <span className="hidden md:inline">새 기록</span>
+          <span className="md:hidden">추가</span>
         </button>
       </div>
 
       {/* Filters & Search */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
+      <div className="flex flex-col md:flex-row gap-3 md:gap-4 mb-4 md:mb-6">
         {/* Search Bar */}
         <div className={`relative flex-1 transition-all duration-300 ${isAiSearchMode ? 'ring-2 ring-purple-500 rounded-lg shadow-sm' : ''}`}>
           {isAiSearchMode ? (
@@ -554,7 +556,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
           
           <input 
             type="text" 
-            placeholder={isAiSearchMode ? "AI 검색: 기억나는 내용이나 상황을 설명해보세요..." : "제목, 태그, 내용 검색..."}
+            placeholder={isAiSearchMode ? "AI 검색: 기억나는 내용을 설명..." : "제목, 태그, 내용 검색..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -587,7 +589,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
         </div>
 
         {/* Tag Filters (Listbox/Select) */}
-        <div className="relative min-w-[200px]">
+        <div className="relative min-w-[150px] md:min-w-[200px]">
             <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
                 <Hash size={16} />
             </div>
@@ -610,7 +612,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
       </div>
 
       {/* Grid Content */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-4 custom-scrollbar">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 overflow-y-auto pb-4 custom-scrollbar">
         {filteredItems.map(item => (
           <div 
             key={item.id} 
@@ -622,7 +624,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
                 }
             }}
             className={`
-                bg-white rounded-xl p-5 shadow-sm border hover:shadow-md transition-all cursor-pointer flex flex-col h-64 group relative
+                bg-white rounded-xl p-4 md:p-5 shadow-sm border hover:shadow-md transition-all cursor-pointer flex flex-col h-64 group relative
                 ${item.isDraft ? 'border-dashed border-blue-300 bg-blue-50/10' : 'border-gray-100'}
                 ${isAiSearchMode && aiResultIds && aiResultIds.includes(item.id) ? 'ring-2 ring-purple-100' : ''}
             `}
@@ -644,7 +646,7 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
               </span>
             </div>
             
-            <h3 className="text-lg font-bold text-gray-800 mb-2 line-clamp-2 pr-12">{item.title}</h3>
+            <h3 className="text-base md:text-lg font-bold text-gray-800 mb-2 line-clamp-2 pr-12">{item.title}</h3>
             
             <p className="text-sm text-gray-500 mb-4 line-clamp-3 flex-1 break-words">
               {stripHtml(getSafeContent(item.content))}
@@ -691,22 +693,22 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
         )}
       </div>
 
-      {/* View Detail Modal */}
+      {/* View Detail Modal - Full Screen on Mobile */}
       {viewingItem && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in-up">
-            <div className="p-8">
-              <div className="flex justify-between items-start mb-6 border-b border-gray-100 pb-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-0 md:p-4">
+          <div className="bg-white md:rounded-2xl w-full h-full md:h-auto md:max-w-3xl md:max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in-up flex flex-col">
+            <div className="p-4 md:p-8 flex-1">
+              <div className="flex justify-between items-start mb-6 border-b border-gray-100 pb-4 sticky top-0 bg-white z-10">
                 <div>
                    <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded border mb-2 ${getCategoryColor(viewingItem.category)}`}>
                       {viewingItem.category}
                    </span>
-                   <h2 className="text-2xl font-bold text-gray-800">{viewingItem.title}</h2>
+                   <h2 className="text-xl md:text-2xl font-bold text-gray-800">{viewingItem.title}</h2>
                    <p className="text-sm text-gray-400 mt-1 flex items-center gap-1">
                     <Clock size={12} /> {formatDateTime(viewingItem.createdAt)}
                    </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 md:gap-2">
                   <button 
                     onClick={() => handleEditStart(viewingItem)}
                     className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -733,13 +735,13 @@ export const KnowledgeBase: React.FC<KnowledgeBaseProps> = ({ items, setItems })
 
               {/* Render Safe HTML Content */}
               <div 
-                className="prose prose-sm max-w-none text-gray-700 leading-relaxed [&>img]:rounded-lg [&>img]:shadow-sm [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5"
+                className="prose prose-sm max-w-none text-gray-700 leading-relaxed [&>img]:rounded-lg [&>img]:shadow-sm [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 pb-20 md:pb-0"
                 dangerouslySetInnerHTML={{ __html: getSafeContent(viewingItem.content) }}
               />
 
               <div className="mt-8 pt-4 border-t border-gray-100 flex items-center gap-2">
                 <Tag size={16} className="text-gray-400" />
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                    {viewingItem.tags.map(tag => (
                       <span key={tag} className="text-sm bg-gray-100 text-gray-600 px-2 py-1 rounded">
                         #{tag}

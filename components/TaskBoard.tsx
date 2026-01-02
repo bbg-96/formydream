@@ -30,6 +30,9 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAiLoading, setIsAiLoading] = useState(false);
   
+  // Mobile Tab State
+  const [activeMobileStatus, setActiveMobileStatus] = useState<TaskStatus>(TaskStatus.TODO);
+  
   // Edit State
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   
@@ -180,24 +183,46 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
   ];
 
   return (
-    <div className="h-full flex flex-col p-6 overflow-hidden">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-800">업무 보드</h2>
+    // [Modified] Changed height handling for mobile to allow body scroll
+    <div className="md:h-full flex flex-col p-4 md:p-6 md:overflow-hidden min-h-[calc(100vh-80px)] md:min-h-0">
+      <div className="flex justify-between items-center mb-4 md:mb-6">
+        <h2 className="text-xl md:text-2xl font-bold text-gray-800">업무 보드</h2>
         <button
           onClick={() => {
               resetForm();
               setIsModalOpen(true);
           }}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
+          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 md:px-4 md:py-2 rounded-lg transition-colors shadow-sm text-sm md:text-base"
         >
           <Plus size={18} />
-          새 작업
+          <span className="hidden md:inline">새 작업</span>
+          <span className="md:hidden">추가</span>
         </button>
       </div>
 
-      {/* Kanban Board */}
-      <div className="flex-1 overflow-x-auto">
-        <div className="flex gap-6 min-w-[1000px] h-full">
+      {/* Mobile Tabs */}
+      <div className="md:hidden flex gap-2 mb-4 overflow-x-auto pb-2 scrollbar-hide">
+        {columns.map(col => (
+            <button
+                key={col.id}
+                onClick={() => setActiveMobileStatus(col.id)}
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-all border ${
+                    activeMobileStatus === col.id 
+                    ? 'bg-slate-800 text-white border-slate-800' 
+                    : 'bg-white text-gray-500 border-gray-200'
+                }`}
+            >
+                {col.label}
+                <span className="ml-2 opacity-70 bg-white/20 px-1.5 rounded-full">
+                    {tasks.filter(t => t.status === col.id).length}
+                </span>
+            </button>
+        ))}
+      </div>
+
+      {/* Kanban Board - Desktop */}
+      <div className="hidden md:flex flex-1 overflow-x-auto">
+        <div className="flex gap-6 min-w-[1000px] w-full h-full">
           {columns.map(col => (
             <div key={col.id} className={`flex-1 flex flex-col rounded-xl p-4 border ${col.color}`}>
               <h3 className="font-semibold text-gray-700 mb-4 flex items-center justify-between">
@@ -206,7 +231,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
                   {tasks.filter(t => t.status === col.id).length}
                 </span>
               </h3>
-              <div className="flex-1 overflow-y-auto space-y-3">
+              <div className="flex-1 overflow-y-auto space-y-3 custom-scrollbar">
                 {tasks.filter(t => t.status === col.id).map(task => (
                   <TaskCard 
                     key={task.id} 
@@ -220,6 +245,26 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Mobile List View (Active Tab Only) */}
+      {/* [Modified] Removed internal scroll (overflow-y-auto) and fixed height (flex-1) for mobile */}
+      <div className="md:hidden space-y-3 pb-4">
+          {tasks.filter(t => t.status === activeMobileStatus).length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+                  <p>이 상태의 작업이 없습니다.</p>
+              </div>
+          ) : (
+              tasks.filter(t => t.status === activeMobileStatus).map(task => (
+                  <TaskCard 
+                    key={task.id} 
+                    task={task} 
+                    onStatusChange={handleStatusChange} 
+                    onDelete={handleDelete}
+                    onEdit={handleEdit} 
+                  />
+              ))
+          )}
       </div>
 
       {/* Add/Edit Task Modal */}
@@ -297,7 +342,7 @@ export const TaskBoard: React.FC<TaskBoardProps> = ({ tasks, setTasks }) => {
                       disabled={isAiLoading || !newTaskTitle}
                       className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 disabled:opacity-50 transition-colors"
                     >
-                      {isAiLoading ? <Loader2 className="animate-spin" size={14} /> : 'AI 작업 분석 및 세분화'}
+                      {isAiLoading ? <Loader2 className="animate-spin" size={14} /> : 'AI 작업 분석'}
                     </button>
                   </div>
                   <p className="text-xs text-indigo-600 mb-3">제목과 설명을 기반으로 하위 작업을 자동으로 생성하고 태그를 추천합니다.</p>
@@ -381,22 +426,23 @@ const TaskCard: React.FC<{
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow group">
+    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow group relative">
       <div className="flex justify-between items-start mb-2">
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${priorityColor[task.priority]}`}>
           {task.priority}
         </span>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button onClick={() => onEdit(task)} className="text-gray-300 hover:text-blue-500">
+        {/* Mobile: Always visible edit buttons, Desktop: Hover */}
+        <div className="flex gap-1 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+            <button onClick={() => onEdit(task)} className="text-gray-300 hover:text-blue-500 p-1">
                 <Edit size={14} />
             </button>
-            <button onClick={() => onDelete(task.id)} className="text-gray-300 hover:text-red-500">
+            <button onClick={() => onDelete(task.id)} className="text-gray-300 hover:text-red-500 p-1">
                 <Trash2 size={14} />
             </button>
         </div>
       </div>
       
-      <h4 className="font-semibold text-gray-800 mb-1">{task.title}</h4>
+      <h4 className="font-semibold text-gray-800 mb-1 text-sm md:text-base">{task.title}</h4>
       
       <div className="flex flex-col gap-2 mb-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -425,7 +471,7 @@ const TaskCard: React.FC<{
         <select 
           value={task.status}
           onChange={(e) => onStatusChange(task.id, e.target.value as TaskStatus)}
-          className="text-xs border border-gray-200 rounded px-1 py-0.5 bg-gray-50 text-gray-600 outline-none cursor-pointer"
+          className="text-xs border border-gray-200 rounded px-1 py-0.5 bg-gray-50 text-gray-600 outline-none cursor-pointer max-w-[120px]"
         >
           {Object.values(TaskStatus).map(s => (
             <option key={s} value={s}>{s}</option>

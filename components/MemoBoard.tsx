@@ -286,6 +286,10 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
 
   useEffect(() => {
     loadMemos();
+    // Force list view on mobile initially
+    if (window.innerWidth < 768) {
+        setShowList(true);
+    }
   }, [userId]);
 
   const loadMemos = async () => {
@@ -328,7 +332,8 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
     await api.memos.save(userId, newMemo);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (window.confirm('메모를 삭제하시겠습니까?')) {
         setMemos(prev => prev.filter(m => m.id !== id));
         await api.memos.delete(id);
@@ -370,6 +375,9 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
     const memo = memos.find(m => m.id === id);
     if (!memo || !containerRef.current) return;
 
+    // Mobile check - if mobile, don't scroll canvas (it's hidden), just update list logic if needed
+    if (window.innerWidth < 768) return;
+
     const container = containerRef.current;
     
     // Calculate position to center the memo
@@ -407,36 +415,33 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
   const filteredMemosList = getFilteredMemos();
 
   // Calculate canvas size.
-  // Instead of a hard minimum of 2000px/1600px which forces scrollbars,
-  // we calculate the actual max extent of memos.
-  // We use CSS min-width/min-height: 100% on the container to ensure it fills the screen
-  // even if content is small, but it will shrink back to 100% when memos are deleted.
   const contentMaxX = memos.reduce((max, m) => Math.max(max, (m.x || 0) + (m.width || 280) + 100), 0);
   const contentMaxY = memos.reduce((max, m) => Math.max(max, (m.y || 0) + (m.height || 280) + 100), 0);
 
   return (
-    <div className="h-full flex flex-col p-6 overflow-hidden relative">
-      <div className="flex justify-between items-center mb-6 z-10 relative">
+    <div className="h-full flex flex-col p-4 md:p-6 overflow-hidden relative">
+      <div className="flex justify-between items-center mb-4 md:mb-6 z-10 relative">
         <div>
-            <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-800 flex items-center gap-2">
             <StickyNote className="text-yellow-500" />
             퀵 메모
             </h2>
-            <p className="text-sm text-gray-500">
+            <p className="text-xs md:text-sm text-gray-500 hidden md:block">
                 메모는 좌측/상단 경계를 넘어갈 수 없습니다.
             </p>
         </div>
         <div className="flex gap-2">
+            {/* Desktop Only List Toggle */}
             <button
                 onClick={() => setShowList(!showList)}
-                className={`p-2 rounded-lg transition-colors border ${showList ? 'bg-blue-100 text-blue-600 border-blue-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
+                className={`hidden md:block p-2 rounded-lg transition-colors border ${showList ? 'bg-blue-100 text-blue-600 border-blue-200' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}
                 title="메모 리스트 보기"
             >
                 <List size={20} />
             </button>
             <button
             onClick={handleAddMemo}
-            className="flex items-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-4 py-2 rounded-lg transition-colors shadow-sm font-bold"
+            className="flex items-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 px-3 py-2 md:px-4 md:py-2 rounded-lg transition-colors shadow-sm font-bold text-sm md:text-base"
             >
             <Plus size={18} />
             새 메모
@@ -445,10 +450,10 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
       </div>
 
       <div className="flex-1 flex overflow-hidden gap-4 relative">
-          {/* Canvas Area */}
+          {/* Canvas Area (Hidden on Mobile) */}
           <div 
             ref={containerRef}
-            className="flex-1 relative overflow-auto bg-gray-50/50 rounded-xl border border-dashed border-gray-200 shadow-inner scroll-smooth"
+            className="hidden md:block flex-1 relative overflow-auto bg-gray-50/50 rounded-xl border border-dashed border-gray-200 shadow-inner scroll-smooth"
           >
             <div 
                 className="relative min-w-full min-h-full transition-all duration-300 ease-out"
@@ -477,18 +482,19 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
             </div>
           </div>
 
-          {/* Sidebar List View */}
+          {/* Sidebar List View (Full Width on Mobile) */}
           <div 
             className={`
                 bg-white border border-gray-200 rounded-xl shadow-lg transition-all duration-300 overflow-hidden flex flex-col
-                ${showList ? 'w-80 opacity-100' : 'w-0 opacity-0 border-0'}
+                ${showList ? 'w-full md:w-80 opacity-100' : 'w-0 opacity-0 border-0 md:w-0'}
             `}
           >
               <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
                   <h3 className="font-bold text-gray-700 flex items-center gap-2">
                       <List size={16} /> 메모 목록
                   </h3>
-                  <button onClick={() => setShowList(false)} className="text-gray-400 hover:text-gray-600">
+                  {/* Close button only on desktop where it's a side panel */}
+                  <button onClick={() => setShowList(false)} className="text-gray-400 hover:text-gray-600 hidden md:block">
                       <X size={16} />
                   </button>
               </div>
@@ -532,9 +538,10 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
 
               <div className="flex-1 overflow-y-auto p-2 space-y-2">
                   {filteredMemosList.length === 0 ? (
-                      <p className="text-center text-gray-400 text-sm py-4">
+                      <div className="flex flex-col items-center justify-center h-40 text-gray-400 text-sm py-4">
+                          <StickyNote size={24} className="mb-2 opacity-20" />
                           {memos.length === 0 ? "메모가 없습니다" : "검색 결과 없음"}
-                      </p>
+                      </div>
                   ) : (
                       filteredMemosList.map(memo => (
                           <div 
@@ -546,16 +553,44 @@ export const MemoBoard: React.FC<MemoBoardProps> = ({ userId }) => {
                               <div className={`absolute left-0 top-0 bottom-0 w-1 ${COLORS[memo.color as keyof typeof COLORS].split(' ')[0]}`}></div>
                               
                               <div className="pl-2">
-                                  <p className="text-sm text-gray-800 line-clamp-2 font-medium">
-                                      {memo.content || '(내용 없음)'}
-                                  </p>
-                                  <div className="flex justify-between items-end mt-2">
+                                  {/* Mobile: Allow Editing directly in List */}
+                                  <textarea
+                                      value={memo.content}
+                                      onChange={(e) => handleUpdate(memo.id, { content: e.target.value })}
+                                      className="w-full bg-transparent resize-none outline-none text-sm text-gray-800 line-clamp-3 focus:line-clamp-none min-h-[40px]"
+                                      placeholder="내용 입력..."
+                                      onClick={(e) => e.stopPropagation()} // Prevent scroll trigger
+                                  />
+
+                                  <div className="flex justify-between items-end mt-2 pt-2 border-t border-gray-50">
                                       <span className="text-[10px] text-gray-400">
                                           {formatDateTime(memo.createdAt)}
                                       </span>
-                                      <span className="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] flex items-center gap-1">
-                                          <MapPin size={10} /> 이동
-                                      </span>
+                                      
+                                      <div className="flex gap-2">
+                                          {/* Mobile Only: Color Dots for quick change */}
+                                          <div className="flex md:hidden gap-1">
+                                            {Object.keys(COLORS).slice(0,3).map((c) => (
+                                                <button
+                                                    key={c}
+                                                    onClick={(e) => { e.stopPropagation(); handleUpdate(memo.id, { color: c as any }); }}
+                                                    className={`w-3 h-3 rounded-full border border-gray-300 ${COLORS[c as keyof typeof COLORS].split(' ')[0]}`}
+                                                />
+                                            ))}
+                                          </div>
+
+                                          <button 
+                                            onClick={(e) => handleDelete(memo.id, e)}
+                                            className="text-gray-300 hover:text-red-500 p-0.5"
+                                          >
+                                              <Trash2 size={12} />
+                                          </button>
+                                          
+                                          {/* Desktop Only: Canvas Link Hint */}
+                                          <span className="hidden md:flex text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] items-center gap-1">
+                                              <MapPin size={10} /> 캔버스 이동
+                                          </span>
+                                      </div>
                                   </div>
                               </div>
                           </div>

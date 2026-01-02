@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote, ChevronUp, ChevronDown, Palette, Check, Upload, X, Image as ImageIcon, Trash2, Move, Menu } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Calendar as CalendarIcon, Bot, LogOut, Cloud, BookOpen, Settings, StickyNote, ChevronUp, ChevronDown, Palette, Check, Upload, X, Image as ImageIcon, Trash2, Move, Menu, Home, Grid } from 'lucide-react';
 import { Task, ViewMode, TaskStatus, TaskPriority, KnowledgeItem, User, MailAccount, ThemeConfig } from './types';
 import { Dashboard } from './components/Dashboard';
 import { TaskBoard } from './components/TaskBoard';
@@ -175,6 +175,8 @@ const App: React.FC = () => {
   
   // Mobile UX State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isNavVisible, setIsNavVisible] = useState(true); // New state for nav visibility
+  const lastScrollY = useRef(0);
 
   // Custom Background State
   const [customSidebarImage, setCustomSidebarImage] = useState<string | null>(null);
@@ -222,6 +224,30 @@ const App: React.FC = () => {
     if (savedSidebarPos) {
         try { setSidebarImagePos(JSON.parse(savedSidebarPos)); } catch(e) {}
     }
+  }, []);
+
+  // Scroll Handler for Mobile Nav
+  useEffect(() => {
+    const handleScroll = () => {
+        if (window.innerWidth >= 768) return; // Mobile only logic
+        
+        const currentScrollY = window.scrollY;
+        
+        // Ignore small movements (bounce effect)
+        if (Math.abs(currentScrollY - lastScrollY.current) < 10) return;
+
+        // Hide on scroll down, Show on scroll up
+        if (currentScrollY > lastScrollY.current && currentScrollY > 50) {
+            setIsNavVisible(false);
+            setIsMobileMenuOpen(false); // Close menu if open when scrolling down
+        } else if (currentScrollY < lastScrollY.current) {
+            setIsNavVisible(true);
+        }
+        lastScrollY.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   // Handle click outside for theme menu
@@ -365,13 +391,13 @@ const App: React.FC = () => {
 
 
   // Layout Components
-  const SidebarItem: React.FC<{ view: ViewMode; icon: React.ReactNode; label: string }> = ({ view, icon, label }) => {
+  const SidebarItem: React.FC<{ view: ViewMode; icon: React.ReactNode; label: string; onClick?: () => void }> = ({ view, icon, label, onClick }) => {
     const isSelected = currentView === view;
     return (
       <button
         onClick={() => {
             setCurrentView(view);
-            setIsMobileMenuOpen(false); // Close sidebar on mobile when item clicked
+            if (onClick) onClick();
         }}
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 
           ${isSelected 
@@ -390,22 +416,12 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden font-sans">
-      {/* Mobile Backdrop Overlay */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-30 md:hidden transition-opacity"
-          onClick={() => setIsMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* Sidebar - Responsive Design */}
+    // Changed to min-h-screen for mobile to allow body scroll, h-screen for desktop
+    <div className="flex min-h-screen md:h-screen bg-gray-100 md:overflow-hidden font-sans">
+      
+      {/* Desktop Sidebar (Hidden on Mobile) */}
       <aside 
-        className={`
-            fixed inset-y-0 left-0 z-40 w-64 shadow-xl transition-transform duration-300 ease-in-out md:relative md:translate-x-0
-            ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
-            flex flex-col relative
-        `}
+        className="hidden md:flex w-64 flex-col shadow-xl z-20 transition-all duration-500 ease-in-out relative"
         style={finalSidebarStyle}
       >
         {/* Dark overlay for readability if custom image exists */}
@@ -423,13 +439,6 @@ const App: React.FC = () => {
                 <p className="text-xs text-white/60">Mate v1.0</p>
               </div>
           </div>
-          {/* Close button for mobile */}
-          <button 
-             onClick={() => setIsMobileMenuOpen(false)} 
-             className="md:hidden text-white/80 hover:text-white"
-          >
-              <X size={24} />
-          </button>
         </div>
 
         <nav className="flex-1 p-4 space-y-2 mt-4 relative z-10 overflow-y-auto">
@@ -455,7 +464,8 @@ const App: React.FC = () => {
 
       {/* Main Content */}
       <main 
-        className="flex-1 flex flex-col min-w-0 overflow-hidden relative transition-all duration-500 w-full"
+        // Changed overflow handling for mobile: Allow body scroll
+        className="flex-1 flex flex-col min-w-0 md:overflow-hidden relative transition-all duration-500 w-full pb-16 md:pb-0"
         style={finalMainStyle}
       >
         
@@ -463,24 +473,17 @@ const App: React.FC = () => {
         {!showHeader && (
           <button
             onClick={() => setShowHeader(true)}
-            className="absolute top-4 right-6 z-50 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 shadow-md rounded-full text-gray-500 hover:text-blue-600 transition-all hover:scale-110"
+            className="hidden md:block absolute top-4 right-6 z-50 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 shadow-md rounded-full text-gray-500 hover:text-blue-600 transition-all hover:scale-110"
             title="상단바 보이기"
           >
             <ChevronDown size={20} />
           </button>
         )}
 
-        {/* Header */}
+        {/* Header - Hidden on Mobile */}
         {showHeader && (
-          <header className="bg-white/90 backdrop-blur-sm border-b border-gray-200/50 h-16 flex items-center justify-between px-4 sm:px-8 shadow-sm z-10 transition-all">
+          <header className="hidden md:flex bg-white/90 backdrop-blur-sm border-b border-gray-200/50 h-16 items-center justify-between px-4 sm:px-8 shadow-sm z-10 transition-all">
             <div className="flex items-center gap-3">
-                {/* Mobile Menu Trigger */}
-                <button
-                    onClick={() => setIsMobileMenuOpen(true)}
-                    className="md:hidden p-2 text-gray-600 hover:bg-gray-100 rounded-lg"
-                >
-                    <Menu size={24} />
-                </button>
                 <h2 className="text-lg sm:text-xl font-bold text-gray-800 tracking-tight truncate">
                 {currentView === 'DASHBOARD' && 'Dashboard'}
                 {currentView === 'TASKS' && 'Task Board'}
@@ -678,7 +681,8 @@ const App: React.FC = () => {
         )}
 
         {/* View Content */}
-        <div className={`flex-1 overflow-auto p-2 sm:p-4 scrollbar-thin scrollbar-thumb-gray-300 ${customMainImage ? 'bg-white/80 backdrop-blur-sm rounded-tl-2xl mt-2 ml-2 shadow-inner' : ''}`}>
+        {/* Changed overflow handling for mobile: Allow body scroll by removing md:overflow-auto on mobile */}
+        <div className={`flex-1 md:overflow-auto p-2 sm:p-4 scrollbar-thin scrollbar-thumb-gray-300 ${customMainImage ? 'bg-white/80 backdrop-blur-sm rounded-tl-2xl mt-2 ml-2 shadow-inner' : ''}`}>
           {currentView === 'DASHBOARD' && <Dashboard tasks={tasks} />}
           {currentView === 'TASKS' && <TaskBoard tasks={tasks} setTasks={setTasks} />}
           {currentView === 'AI_CHAT' && <GeminiChat tasks={tasks} knowledgeItems={knowledgeItems} />}
@@ -696,6 +700,102 @@ const App: React.FC = () => {
           {currentView === 'MY_PAGE' && <MyPage user={user} />}
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className={`md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex justify-around items-center h-16 z-30 px-2 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] transition-transform duration-300 ${isNavVisible ? 'translate-y-0' : 'translate-y-full'}`}>
+         <button onClick={() => setCurrentView('DASHBOARD')} className={`flex flex-col items-center p-2 w-16 ${currentView === 'DASHBOARD' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+           <Home size={22} strokeWidth={currentView === 'DASHBOARD' ? 2.5 : 2} />
+           <span className="text-[10px] mt-1 font-medium">홈</span>
+         </button>
+         <button onClick={() => setCurrentView('TASKS')} className={`flex flex-col items-center p-2 w-16 ${currentView === 'TASKS' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+           <ListTodo size={22} strokeWidth={currentView === 'TASKS' ? 2.5 : 2} />
+           <span className="text-[10px] mt-1 font-medium">업무</span>
+         </button>
+         <button onClick={() => setCurrentView('AI_CHAT')} className={`flex flex-col items-center p-2 w-16 ${currentView === 'AI_CHAT' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+           <Bot size={22} strokeWidth={currentView === 'AI_CHAT' ? 2.5 : 2} />
+           <span className="text-[10px] mt-1 font-medium">AI</span>
+         </button>
+         <button onClick={() => setCurrentView('SCHEDULE')} className={`flex flex-col items-center p-2 w-16 ${currentView === 'SCHEDULE' ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}>
+           <CalendarIcon size={22} strokeWidth={currentView === 'SCHEDULE' ? 2.5 : 2} />
+           <span className="text-[10px] mt-1 font-medium">일정</span>
+         </button>
+         <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className={`flex flex-col items-center p-2 w-16 ${isMobileMenuOpen ? 'text-gray-800' : 'text-gray-400 hover:text-gray-600'}`}>
+           <Menu size={22} />
+           <span className="text-[10px] mt-1 font-medium">전체</span>
+         </button>
+      </nav>
+
+      {/* Mobile Bottom Sheet Menu (Replaces Full Screen Overlay) */}
+      {isMobileMenuOpen && (
+        <>
+            {/* Backdrop */}
+            <div 
+              className="fixed inset-0 z-40 bg-black/50 md:hidden backdrop-blur-sm"
+              onClick={() => setIsMobileMenuOpen(false)}
+            ></div>
+
+            {/* Bottom Sheet Menu */}
+            <div className={`fixed left-0 right-0 z-50 bg-white rounded-t-2xl shadow-[0_-8px_30px_rgba(0,0,0,0.12)] border-t border-gray-100 p-6 md:hidden animate-fade-in-up transition-all duration-300 ${isNavVisible ? 'bottom-16' : 'bottom-0'}`}>
+               <div className="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-6"></div>
+
+               {/* User Profile Summary */}
+               <div className="flex items-center gap-3 mb-6 bg-gray-50 p-3 rounded-xl border border-gray-100 active:bg-gray-100" onClick={() => { setCurrentView('MY_PAGE'); setIsMobileMenuOpen(false); }}>
+                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                       {user.name.charAt(0).toUpperCase()}
+                   </div>
+                   <div className="flex-1">
+                       <h3 className="text-sm font-bold text-gray-800">{user.name}</h3>
+                       <p className="text-xs text-gray-500">{user.email}</p>
+                   </div>
+                   <Settings size={16} className="text-gray-400" />
+               </div>
+
+               {/* Icon Grid */}
+               <div className="grid grid-cols-4 gap-2">
+                  <button 
+                    onClick={() => { setCurrentView('MEMO'); setIsMobileMenuOpen(false); }} 
+                    className="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                     <div className="w-12 h-12 bg-yellow-100 rounded-2xl flex items-center justify-center text-yellow-600 shadow-sm">
+                        <StickyNote size={24} />
+                     </div>
+                     <span className="text-xs font-medium text-gray-600">메모</span>
+                  </button>
+
+                  <button 
+                    onClick={() => { setCurrentView('KNOWLEDGE'); setIsMobileMenuOpen(false); }} 
+                    className="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                     <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center text-green-600 shadow-sm">
+                        <BookOpen size={24} />
+                     </div>
+                     <span className="text-xs font-medium text-gray-600">지식</span>
+                  </button>
+
+                  <button 
+                    onClick={() => { setCurrentView('MY_PAGE'); setIsMobileMenuOpen(false); }} 
+                    className="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                     <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-600 shadow-sm">
+                        <Settings size={24} />
+                     </div>
+                     <span className="text-xs font-medium text-gray-600">설정</span>
+                  </button>
+
+                  <button 
+                    onClick={handleLogout} 
+                    className="flex flex-col items-center gap-2 p-2 rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                     <div className="w-12 h-12 bg-red-100 rounded-2xl flex items-center justify-center text-red-600 shadow-sm">
+                        <LogOut size={24} />
+                     </div>
+                     <span className="text-xs font-medium text-gray-600">로그아웃</span>
+                  </button>
+               </div>
+            </div>
+        </>
+      )}
+
     </div>
   );
 };
